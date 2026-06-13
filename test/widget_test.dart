@@ -1,30 +1,22 @@
-// This is a basic Flutter widget test.
+// 这是一个基础的 Flutter Widget 测试文件。
 //
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+// `WidgetTester` 可以帮助你在测试环境里渲染组件、查找节点、
+// 模拟点击和滚动，并验证页面上最终显示的内容是否符合预期。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:my_first_app/main.dart';
+import 'package:my_first_app/app/app.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
+  testWidgets('应用启动后可以渲染当前首页骨架', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(const MyApp());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('首页'), findsOneWidget);
+    expect(find.text('首页模块占位页'), findsOneWidget);
+    expect(find.text('这个页面是后续业务组件、页面分区和状态管理接入的起点。'), findsOneWidget);
+    expect(find.byIcon(Icons.add), findsNothing);
   });
 }

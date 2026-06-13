@@ -1,28 +1,22 @@
-# This file configures the analyzer, which statically analyzes Dart code to
-# check for errors, warnings, and lints.
+# 这个文件用于配置 Dart/Flutter 的静态分析器。
+# 分析器会检查代码中的错误、警告和 lint 规则。
 #
-# The issues identified by the analyzer are surfaced in the UI of Dart-enabled
-# IDEs (https://dart.dev/tools#ides-and-editors). The analyzer can also be
-# invoked from the command line by running `flutter analyze`.
+# IDE 中看到的大部分代码诊断信息都来自这里的配置。
+# 你也可以在命令行中执行 `flutter analyze` 手动检查。
 
-# The following line activates a set of recommended lints for Flutter apps,
-# packages, and plugins designed to encourage good coding practices.
+# 下面这一行启用 Flutter 官方推荐的一组 lint 规则，
+# 用来帮助项目保持更好的编码习惯。
 include: package:flutter_lints/flutter.yaml
 
 linter:
-  # The lint rules applied to this project can be customized in the
-  # section below to disable rules from the `package:flutter_lints/flutter.yaml`
-  # included above or to enable additional rules. A list of all available lints
-  # and their documentation is published at https://dart.dev/lints.
+  # 如果后续需要，可以在这里关闭某些规则，或增加额外规则。
+  # 所有可选 lint 规则可查看：https://dart.dev/lints
   #
-  # Instead of disabling a lint rule for the entire project in the
-  # section below, it can also be suppressed for a single line of code
-  # or a specific dart file by using the `// ignore: name_of_lint` and
-  # `// ignore_for_file: name_of_lint` syntax on the line or in the file
-  # producing the lint.
+  # 如果只是个别代码不想触发某条规则，也可以在对应文件或代码行使用
+  # `// ignore: rule_name` 或 `// ignore_for_file: rule_name`。
   rules:
-    # avoid_print: false  # Uncomment to disable the `avoid_print` rule
-    # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
+    # avoid_print: false  # 取消注释后可关闭 `avoid_print` 规则
+    # prefer_single_quotes: true  # 取消注释后可启用单引号优先规则
 
-# Additional information about this file can be found at
+# 更多说明可查看：
 # https://dart.dev/guides/language/analysis-options
