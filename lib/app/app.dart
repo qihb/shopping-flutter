@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:my_first_app/app/presentation/pages/main_tab_page.dart';
 import 'package:my_first_app/app/theme/app_theme.dart';
-import 'package:my_first_app/features/home/presentation/pages/home_page.dart';
 
 /// 整个应用的根组件。
 ///
@@ -19,8 +19,9 @@ class MyApp extends StatelessWidget {
       title: 'Flutter 电商学习项目',
       // 全局主题配置统一从 theme 文件读取，避免页面里到处写样式。
       theme: AppTheme.light(),
-      // 当前默认首页是 HomePage，后续你可以替换成真正的业务首页。
-      home: const HomePage(),
+      // 现在先把应用入口切到带底部导航的主页面，
+      // 这样首页、分类、购物车、我的 4 个一级页面就有统一承载容器了。
+      home: const MainTabPage(),
     );
   }
 }
