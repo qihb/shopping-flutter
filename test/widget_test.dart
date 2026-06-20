@@ -26,7 +26,7 @@ void main() {
     expect(find.text('轮播推荐'), findsOneWidget);
     expect(find.text('精选 2 张图片和 2 条视频素材，模拟电商首页焦点内容位'), findsOneWidget);
     expect(find.text('露营装备开箱'), findsOneWidget);
-    await tester.fling(find.byType(ListView), const Offset(0, -800), 1000);
+    await tester.fling(find.byType(Scrollable).first, const Offset(0, -800), 1000);
     await tester.pumpAndSettle();
     expect(find.text('为你推荐'), findsOneWidget);
     expect(find.text('夏季轻运动鞋'), findsOneWidget);
@@ -135,7 +135,7 @@ void main() {
       find.byKey(const ValueKey<String>('home-banner-video-player')),
       findsOneWidget,
     );
-    await tester.fling(find.byType(ListView), const Offset(0, -500), 1000);
+    await tester.fling(find.byType(Scrollable).first, const Offset(0, -500), 1000);
     await tester.pumpAndSettle();
     expect(find.text('视频内容'), findsOneWidget);
     expect(find.text('立即购买同款'), findsOneWidget);
