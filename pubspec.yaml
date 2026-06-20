@@ -24,6 +24,7 @@ dependencies:
 
   # 这个依赖提供 iOS 风格图标，通常配合 `CupertinoIcons` 使用。
   cupertino_icons: ^1.0.8
+  video_player: ^2.11.1
 
 dev_dependencies:
   flutter_test:
