@@ -18,21 +18,30 @@ class MainTabPage extends StatefulWidget {
 
 class _MainTabPageState extends State<MainTabPage> {
   int _currentIndex = 0;
+  String? _selectedCategoryLabel;
 
-  // 4 个一级页面先按顺序放进列表，底部点击后通过索引切换显示内容。
-  final List<Widget> _pages = const [
-    HomePage(),
-    CategoryPage(),
-    CartPage(),
-    ProfilePage(),
-  ];
+  void _openCategoryFromHome(String categoryLabel) {
+    setState(() {
+      _selectedCategoryLabel = categoryLabel;
+      _currentIndex = 1;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    // 4 个一级页面还是通过 `IndexedStack` 统一承载，
+    // 只是首页和分类页现在需要和外层交换一点点状态。
+    final List<Widget> pages = [
+      HomePage(onCategoryTap: _openCategoryFromHome),
+      CategoryPage(initialCategoryLabel: _selectedCategoryLabel),
+      const CartPage(),
+      const ProfilePage(),
+    ];
+
     return Scaffold(
       // `IndexedStack` 很适合做 Tab 场景。
       // 它会像网页里“切换页签但保留内容”那样，只显示当前索引对应的页面。
-      body: IndexedStack(index: _currentIndex, children: _pages),
+      body: IndexedStack(index: _currentIndex, children: pages),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         type: BottomNavigationBarType.fixed,

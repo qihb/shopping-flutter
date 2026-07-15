@@ -4,6 +4,7 @@ import 'package:my_first_app/features/home/data/home_recommend_mock_service.dart
 import 'package:my_first_app/features/home/presentation/models/home_recommend_product.dart';
 import 'package:my_first_app/features/home/presentation/widgets/home_banner_carousel.dart';
 import 'package:my_first_app/features/home/presentation/widgets/recommend_product_card.dart';
+import 'package:my_first_app/features/home/presentation/pages/product_detail_page.dart';
 
 /// 首页页面。
 ///
@@ -22,7 +23,10 @@ import 'package:my_first_app/features/home/presentation/widgets/recommend_produc
 /// 这里改成 `StatefulWidget`，
 /// 是因为“推荐商品是否还在加载、已经加载到第几页”都属于页面里的本地状态。
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  const HomePage({
+    super.key,
+    this.onCategoryTap,
+  });
 
   static const List<_HomeCategoryItem> _categories = [
     _HomeCategoryItem(label: '服饰', icon: Icons.checkroom_outlined),
@@ -32,6 +36,12 @@ class HomePage extends StatefulWidget {
     _HomeCategoryItem(label: '家居', icon: Icons.chair_outlined),
     _HomeCategoryItem(label: '食品', icon: Icons.local_grocery_store_outlined),
   ];
+
+  /// 首页分类入口点击后的回调。
+  ///
+  /// 这里把点击结果往外抛，是为了让外层主页面决定：
+  /// 当前是切 Tab、打开新页，还是做别的跳转承接。
+  final ValueChanged<String>? onCategoryTap;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -132,6 +142,16 @@ class _HomePageState extends State<HomePage> {
     await _loadMoreProducts();
   }
 
+  void _openProductDetail(HomeRecommendProduct product) {
+    // `Navigator.push` 会把详情页压到当前页面栈顶。
+    // 对 Flutter 初学者来说，可以先把它理解成“从列表进入一个新页面”。
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ProductDetailPage(product: product),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -165,7 +185,12 @@ class _HomePageState extends State<HomePage> {
                       spacing: 12,
                       runSpacing: 12,
                       children: HomePage._categories
-                          .map((item) => _HomeCategoryChip(item: item))
+                          .map(
+                            (item) => _HomeCategoryChip(
+                              item: item,
+                              onTap: () => widget.onCategoryTap?.call(item.label),
+                            ),
+                          )
                           .toList(),
                     ),
                     const SizedBox(height: 24),
@@ -204,6 +229,7 @@ class _HomePageState extends State<HomePage> {
               description: product.description,
               priceLabel: product.priceLabel,
               tag: product.tag,
+              onTap: () => _openProductDetail(product),
             ),
           ),
         ),
@@ -390,26 +416,36 @@ class _RecommendLoadMoreFinished extends StatelessWidget {
 /// 这里用 `Wrap` 包裹多个卡片，可以在空间不够时自动换行。
 /// 这很适合做数量不多、需要平铺展示的入口按钮。
 class _HomeCategoryChip extends StatelessWidget {
-  const _HomeCategoryChip({required this.item});
+  const _HomeCategoryChip({
+    required this.item,
+    required this.onTap,
+  });
 
   final _HomeCategoryItem item;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       width: 104,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerLow,
+      child: InkWell(
         borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(item.icon),
-          const SizedBox(height: 8),
-          Text(item.label, style: Theme.of(context).textTheme.bodyMedium),
-        ],
+        onTap: onTap,
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(item.icon),
+              const SizedBox(height: 8),
+              Text(item.label, style: Theme.of(context).textTheme.bodyMedium),
+            ],
+          ),
+        ),
       ),
     );
   }

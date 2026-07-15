@@ -52,7 +52,8 @@ void main() {
 
     await tester.tap(find.text('分类'));
     await tester.pumpAndSettle();
-    expect(find.text('分类内容建设中'), findsOneWidget);
+    expect(find.text('运动速干T恤'), findsOneWidget);
+    expect(find.text('轻量防晒衬衫'), findsOneWidget);
 
     await tester.tap(find.text('购物车'));
     await tester.pumpAndSettle();
