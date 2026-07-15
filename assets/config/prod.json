@@ -1,0 +1,5 @@
+{
+  "appName": "My First App",
+  "apiBaseUrl": "https://api.example.com",
+  "enableDebugTools": false
+}

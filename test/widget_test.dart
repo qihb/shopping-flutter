@@ -7,12 +7,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:my_first_app/app/app.dart';
+import 'package:my_first_app/app/config/app_config.dart';
+import 'package:my_first_app/app/config/app_config_store.dart';
+import 'package:my_first_app/app/config/app_environment.dart';
 import 'package:my_first_app/features/home/presentation/models/home_banner_item.dart';
 import 'package:my_first_app/features/home/presentation/pages/home_banner_detail_page.dart';
 import 'package:my_first_app/features/home/presentation/widgets/home_banner_carousel.dart';
 import 'package:my_first_app/features/home/presentation/widgets/home_banner_video_player.dart';
 
 void main() {
+  setUp(() {
+    AppConfigStore.setConfig(
+      const AppConfig(
+        environment: AppEnvironment.dev,
+        appName: 'My First App Test',
+        apiBaseUrl: 'https://test-api.example.com',
+        enableDebugTools: true,
+      ),
+    );
+  });
+
   testWidgets('应用启动后显示 4 个底部导航菜单并默认停留在首页', (
     WidgetTester tester,
   ) async {

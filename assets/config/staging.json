@@ -1,0 +1,5 @@
+{
+  "appName": "My First App Staging",
+  "apiBaseUrl": "https://staging-api.example.com",
+  "enableDebugTools": true
+}
