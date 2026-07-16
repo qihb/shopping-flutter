@@ -9,8 +9,6 @@ import 'package:my_first_app/features/home/presentation/models/home_recommend_pr
 /// - 后续有真实接口后，可以继续保留这个方法签名
 /// - 到时主要把内部 mock 数据替换成真实请求即可
 class HomeRecommendMockService {
-  const HomeRecommendMockService();
-
   /// 当前只是为了说明未来接口会请求哪个资源位，先放一个占位地址。
   ///
   /// 后续如果你接入真实后端，优先替换这里的 URL 和请求实现。
@@ -63,6 +61,8 @@ class HomeRecommendMockService {
       ),
     ],
   };
+
+  const HomeRecommendMockService();
 
   Future<HomeRecommendPageResult> fetchRecommendProducts({
     required int page,

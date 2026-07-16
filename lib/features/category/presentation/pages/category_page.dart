@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'package:my_first_app/features/home/presentation/models/home_recommend_product.dart';
+import 'package:my_first_app/features/home/presentation/pages/product_detail_page.dart';
+
 /// 分类页。
 ///
 /// 这里把页面改成了“左侧分类导航 + 右侧商品网格”的双栏结构，
@@ -8,15 +11,13 @@ import 'package:flutter/material.dart';
 /// 左边更像“当前浏览的大类目录”，右边则展示当前分类下的商品卡片列表。
 /// 先把这个基础骨架搭起来，后面再继续接筛选、二级分类和真实数据。
 class CategoryPage extends StatefulWidget {
-  const CategoryPage({
-    super.key,
-    this.initialCategoryLabel,
-  });
-
   /// 这个参数用来承接“从首页点某个分类后，分类页应该默认选中谁”。
   ///
   /// 你可以先把它理解成网页里进入页面时携带的初始筛选条件。
   final String? initialCategoryLabel;
+  final ValueChanged<HomeRecommendProduct>? onAddToCart;
+
+  const CategoryPage({super.key, this.initialCategoryLabel, this.onAddToCart});
 
   @override
   State<CategoryPage> createState() => _CategoryPageState();
@@ -52,6 +53,27 @@ class _CategoryPageState extends State<CategoryPage> {
     );
 
     return index >= 0 ? index : 0;
+  }
+
+  void _openProductDetail({
+    required _CategorySection section,
+    required _CategoryProduct product,
+  }) {
+    final HomeRecommendProduct detailProduct = HomeRecommendProduct(
+      name: product.name,
+      description: '${section.label}分类里的精选单品，后面可以继续补更完整的商品卖点说明。',
+      priceLabel: 'EUR ${product.priceLabel}',
+      tag: section.label,
+    );
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ProductDetailPage(
+          product: detailProduct,
+          onAddToCart: () => widget.onAddToCart?.call(detailProduct),
+        ),
+      ),
+    );
   }
 
   @override
@@ -102,7 +124,9 @@ class _CategoryPageState extends State<CategoryPage> {
                         color: isSelected
                             ? colorScheme.primary
                             : colorScheme.onSurfaceVariant,
-                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        fontWeight: isSelected
+                            ? FontWeight.w700
+                            : FontWeight.w500,
                       ),
                     ),
                   ),
@@ -127,9 +151,16 @@ class _CategoryPageState extends State<CategoryPage> {
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
                     sliver: SliverGrid(
                       delegate: SliverChildBuilderDelegate((context, index) {
-                        final _CategoryProduct product = activeSection.products[index];
+                        final _CategoryProduct product =
+                            activeSection.products[index];
 
-                        return _CategoryProductCard(product: product);
+                        return _CategoryProductCard(
+                          product: product,
+                          onTap: () => _openProductDetail(
+                            section: activeSection,
+                            product: product,
+                          ),
+                        );
                       }, childCount: activeSection.products.length),
                       gridDelegate:
                           const SliverGridDelegateWithFixedCrossAxisCount(
@@ -151,9 +182,9 @@ class _CategoryPageState extends State<CategoryPage> {
 }
 
 class _CategorySectionHeader extends StatelessWidget {
-  const _CategorySectionHeader({required this.section});
-
   final _CategorySection section;
+
+  const _CategorySectionHeader({required this.section});
 
   @override
   Widget build(BuildContext context) {
@@ -177,71 +208,77 @@ class _CategorySectionHeader extends StatelessWidget {
 }
 
 class _CategoryProductCard extends StatelessWidget {
-  const _CategoryProductCard({required this.product});
-
   final _CategoryProduct product;
+  final VoidCallback onTap;
+
+  const _CategoryProductCard({required this.product, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final ColorScheme colorScheme = Theme.of(context).colorScheme;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Container(
-            decoration: BoxDecoration(
-              color: colorScheme.secondaryContainer,
-              borderRadius: BorderRadius.circular(16),
+    return InkWell(
+      key: ValueKey<String>('category-product-${product.name}'),
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: colorScheme.secondaryContainer,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              alignment: Alignment.center,
+              child: Icon(product.icon, color: colorScheme.primary),
             ),
-            alignment: Alignment.center,
-            child: Icon(product.icon, color: colorScheme.primary),
           ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          product.name,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(
-            context,
-          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          product.priceLabel,
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            color: colorScheme.primary,
-            fontWeight: FontWeight.w700,
+          const SizedBox(height: 8),
+          Text(
+            product.name,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
-        ),
-      ],
+          const SizedBox(height: 4),
+          Text(
+            'EUR ${product.priceLabel}',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: colorScheme.primary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
 class _CategorySection {
+  final String label;
+  final String description;
+  final List<_CategoryProduct> products;
+
   const _CategorySection({
     required this.label,
     required this.description,
     required this.products,
   });
-
-  final String label;
-  final String description;
-  final List<_CategoryProduct> products;
 }
 
 class _CategoryProduct {
+  final String name;
+  final String priceLabel;
+  final IconData icon;
+
   const _CategoryProduct({
     required this.name,
     required this.priceLabel,
     required this.icon,
   });
-
-  final String name;
-  final String priceLabel;
-  final IconData icon;
 }
 
 const List<_CategorySection> _categorySections = [

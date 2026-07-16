@@ -47,7 +47,7 @@ void main() {
     expect(find.text('极简双肩包'), findsOneWidget);
   });
 
-  testWidgets('点击底部导航后可以切换到对应占位页面', (WidgetTester tester) async {
+  testWidgets('点击底部导航后可以切换到对应一级页面', (WidgetTester tester) async {
     await tester.pumpWidget(const MyApp());
 
     await tester.tap(find.text('分类'));
@@ -57,11 +57,16 @@ void main() {
 
     await tester.tap(find.text('购物车'));
     await tester.pumpAndSettle();
-    expect(find.text('购物车内容建设中'), findsOneWidget);
+    expect(find.text('购物车还是空的'), findsOneWidget);
+    expect(find.text('先去首页挑一件喜欢的商品吧'), findsOneWidget);
 
     await tester.tap(find.text('我的'));
     await tester.pumpAndSettle();
-    expect(find.text('我的内容建设中'), findsOneWidget);
+    expect(find.text('Hi, Qi Hai Bing'), findsOneWidget);
+    expect(find.text('订单状态'), findsOneWidget);
+    expect(find.text('待付款'), findsOneWidget);
+    expect(find.text('待发货'), findsOneWidget);
+    expect(find.text('基础设置'), findsOneWidget);
   });
 
   testWidgets('首页轮播横幅点击视频卡片时会回传对应素材', (WidgetTester tester) async {

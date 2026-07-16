@@ -5,6 +5,12 @@ import 'package:flutter/material.dart';
 /// `Card` 可以理解成 Material 风格里很常见的一种“信息承载容器”。
 /// 电商首页里的商品推荐、订单摘要、地址信息等内容，经常都可以放进卡片里展示。
 class RecommendProductCard extends StatelessWidget {
+  final String name;
+  final String description;
+  final String priceLabel;
+  final String tag;
+  final VoidCallback? onTap;
+
   const RecommendProductCard({
     super.key,
     required this.name,
@@ -13,12 +19,6 @@ class RecommendProductCard extends StatelessWidget {
     required this.tag,
     this.onTap,
   });
-
-  final String name;
-  final String description;
-  final String priceLabel;
-  final String tag;
-  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {

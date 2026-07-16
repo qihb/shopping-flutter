@@ -6,16 +6,16 @@ import 'package:video_player/video_player.dart';
 /// 这里单独抽成组件，而不是把播放器逻辑直接写进页面里，
 /// 是为了把“初始化控制器、播放暂停、异常兜底”这些职责收拢到一个地方。
 class HomeBannerVideoPlayer extends StatefulWidget {
+  final String videoUrl;
+  final Color accentColor;
+  final String title;
+
   const HomeBannerVideoPlayer({
     super.key,
     required this.videoUrl,
     required this.accentColor,
     required this.title,
   });
-
-  final String videoUrl;
-  final Color accentColor;
-  final String title;
 
   @override
   State<HomeBannerVideoPlayer> createState() => _HomeBannerVideoPlayerState();
@@ -71,7 +71,6 @@ class _HomeBannerVideoPlayerState extends State<HomeBannerVideoPlayer> {
     } else {
       await controller.play();
     }
-
   }
 
   Future<void> _seekTo(double progress) async {
@@ -114,7 +113,8 @@ class _HomeBannerVideoPlayerState extends State<HomeBannerVideoPlayer> {
             );
           }
 
-          if (controller == null || snapshot.connectionState != ConnectionState.done) {
+          if (controller == null ||
+              snapshot.connectionState != ConnectionState.done) {
             return _VideoLoadingState(accentColor: widget.accentColor);
           }
 
@@ -174,6 +174,12 @@ class _HomeBannerVideoPlayerState extends State<HomeBannerVideoPlayer> {
 /// 它负责展示播放时间、总时长和进度条。
 /// 你可以把它理解成视频播放器底部那一排“信息 + 控制器”的 UI 组件。
 class HomeBannerVideoControls extends StatelessWidget {
+  final Duration currentPosition;
+  final Duration totalDuration;
+  final bool isPlaying;
+  final ValueChanged<double> onSeek;
+  final VoidCallback onTogglePlayback;
+
   const HomeBannerVideoControls({
     super.key,
     required this.currentPosition,
@@ -182,12 +188,6 @@ class HomeBannerVideoControls extends StatelessWidget {
     required this.onSeek,
     required this.onTogglePlayback,
   });
-
-  final Duration currentPosition;
-  final Duration totalDuration;
-  final bool isPlaying;
-  final ValueChanged<double> onSeek;
-  final VoidCallback onTogglePlayback;
 
   @override
   Widget build(BuildContext context) {
@@ -222,13 +222,14 @@ class HomeBannerVideoControls extends StatelessWidget {
                   child: SliderTheme(
                     data: SliderTheme.of(context).copyWith(
                       trackHeight: 4,
-                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                      thumbShape: const RoundSliderThumbShape(
+                        enabledThumbRadius: 6,
+                      ),
+                      overlayShape: const RoundSliderOverlayShape(
+                        overlayRadius: 12,
+                      ),
                     ),
-                    child: Slider(
-                      value: progress,
-                      onChanged: onSeek,
-                    ),
+                    child: Slider(value: progress, onChanged: onSeek),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -249,7 +250,9 @@ class HomeBannerVideoControls extends StatelessWidget {
                   backgroundColor: Colors.white.withValues(alpha: 0.12),
                 ),
                 onPressed: onTogglePlayback,
-                icon: Icon(isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                icon: Icon(
+                  isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                ),
                 label: Text(isPlaying ? '暂停' : '播放'),
               ),
             ),
@@ -283,9 +286,9 @@ String formatVideoDuration(Duration duration) {
 }
 
 class _VideoLoadingState extends StatelessWidget {
-  const _VideoLoadingState({required this.accentColor});
-
   final Color accentColor;
+
+  const _VideoLoadingState({required this.accentColor});
 
   @override
   Widget build(BuildContext context) {
@@ -308,7 +311,10 @@ class _VideoLoadingState extends StatelessWidget {
             SizedBox(height: 12),
             Text(
               '视频加载中...',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ],
         ),
@@ -318,15 +324,15 @@ class _VideoLoadingState extends StatelessWidget {
 }
 
 class _VideoFallbackState extends StatelessWidget {
+  final String title;
+  final Color accentColor;
+  final String message;
+
   const _VideoFallbackState({
     required this.title,
     required this.accentColor,
     required this.message,
   });
-
-  final String title;
-  final Color accentColor;
-  final String message;
 
   @override
   Widget build(BuildContext context) {
@@ -339,10 +345,7 @@ class _VideoFallbackState extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                accentColor.withValues(alpha: 0.96),
-                Colors.black87,
-              ],
+              colors: [accentColor.withValues(alpha: 0.96), Colors.black87],
             ),
           ),
           child: Padding(
@@ -365,10 +368,11 @@ class _VideoFallbackState extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                          ),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
                         ),
                       ],
                     ),
@@ -385,17 +389,16 @@ class _VideoFallbackState extends StatelessWidget {
                       const SizedBox(height: 12),
                       Text(
                         title,
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                        ),
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         message,
-                        style: Theme.of(
-                          context,
-                        ).textTheme.bodyMedium?.copyWith(
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: Colors.white70,
                           height: 1.6,
                         ),

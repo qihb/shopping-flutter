@@ -7,10 +7,14 @@ import 'package:my_first_app/features/home/presentation/models/home_banner_item.
 /// 这样做的好处是不用额外引入图片资源，也能先把视觉结构和类型差异搭出来。
 /// 后续如果你想替换成真实图片或视频封面，只需要改这里的展示方式。
 class HomeBannerMediaArtwork extends StatelessWidget {
-  const HomeBannerMediaArtwork({super.key, required this.item, this.isDetail = false});
-
   final HomeBannerItem item;
   final bool isDetail;
+
+  const HomeBannerMediaArtwork({
+    super.key,
+    required this.item,
+    this.isDetail = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -72,10 +76,10 @@ class HomeBannerMediaArtwork extends StatelessWidget {
 }
 
 class _ImageArtwork extends StatelessWidget {
-  const _ImageArtwork({required this.item, required this.iconSize});
-
   final HomeBannerItem item;
   final double iconSize;
+
+  const _ImageArtwork({required this.item, required this.iconSize});
 
   @override
   Widget build(BuildContext context) {
@@ -88,7 +92,11 @@ class _ImageArtwork extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Center(
-              child: Icon(item.artworkIcon, size: iconSize, color: Colors.white),
+              child: Icon(
+                item.artworkIcon,
+                size: iconSize,
+                color: Colors.white,
+              ),
             ),
           ),
         ),
@@ -122,10 +130,10 @@ class _ImageArtwork extends StatelessWidget {
 }
 
 class _VideoArtwork extends StatelessWidget {
-  const _VideoArtwork({required this.item, required this.iconSize});
-
   final HomeBannerItem item;
   final double iconSize;
+
+  const _VideoArtwork({required this.item, required this.iconSize});
 
   @override
   Widget build(BuildContext context) {
@@ -143,7 +151,6 @@ class _VideoArtwork extends StatelessWidget {
               alignment: Alignment.center,
               children: [
                 Icon(item.artworkIcon, size: iconSize, color: Colors.white70),
-                
               ],
             ),
           ),

@@ -12,12 +12,10 @@ import 'package:my_first_app/features/home/presentation/models/home_recommend_pr
 /// 这样一来，首页的推荐商品就不只是“能看到”，
 /// 而是已经具备了“点进去继续浏览”的基本链路。
 class ProductDetailPage extends StatelessWidget {
-  const ProductDetailPage({
-    super.key,
-    required this.product,
-  });
-
   final HomeRecommendProduct product;
+  final VoidCallback? onAddToCart;
+
+  const ProductDetailPage({super.key, required this.product, this.onAddToCart});
 
   @override
   Widget build(BuildContext context) {
@@ -54,7 +52,9 @@ class ProductDetailPage extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             product.name,
-            style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+            style: textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
@@ -84,7 +84,10 @@ class ProductDetailPage extends StatelessWidget {
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    onAddToCart?.call();
+                    Navigator.of(context).pop();
+                  },
                   child: const Text('加入购物车'),
                 ),
               ),
@@ -104,9 +107,9 @@ class ProductDetailPage extends StatelessWidget {
 }
 
 class _ProductTagChip extends StatelessWidget {
-  const _ProductTagChip({required this.label});
-
   final String label;
+
+  const _ProductTagChip({required this.label});
 
   @override
   Widget build(BuildContext context) {

@@ -12,9 +12,9 @@ import 'package:my_first_app/features/home/presentation/widgets/home_banner_vide
 /// 这里改成 `StatefulWidget`，是因为当前页索引和自动轮播计时器都会变化。
 /// 你可以把它理解成“横幅区自己维护一小块交互状态”。
 class HomeBannerCarousel extends StatefulWidget {
-  const HomeBannerCarousel({super.key, this.onItemTap});
-
   final ValueChanged<HomeBannerItem>? onItemTap;
+
+  const HomeBannerCarousel({super.key, this.onItemTap});
 
   @override
   State<HomeBannerCarousel> createState() => _HomeBannerCarouselState();
@@ -32,7 +32,8 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
       accentColor: Color(0xFF4DB6AC),
       backgroundColor: Color(0xFFE8F7F5),
       artworkIcon: Icons.forest_outlined,
-      mediaUrl: 'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4',
+      mediaUrl:
+          'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4',
       durationLabel: '01:28',
     ),
     HomeBannerItem(
@@ -115,9 +116,7 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
     // `Navigator.push` 可以理解成“把一个新页面压到页面栈顶”。
     // 这和前端里点击卡片后进入详情路由是类似的体验。
     Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => HomeBannerDetailPage(item: item),
-      ),
+      MaterialPageRoute<void>(builder: (_) => HomeBannerDetailPage(item: item)),
     );
   }
 
@@ -187,10 +186,10 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
 }
 
 class _HomeBannerCard extends StatelessWidget {
-  const _HomeBannerCard({required this.item, required this.onTap});
-
   final HomeBannerItem item;
   final VoidCallback onTap;
+
+  const _HomeBannerCard({required this.item, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -270,9 +269,9 @@ class _HomeBannerCard extends StatelessWidget {
 }
 
 class _MediaTypeChip extends StatelessWidget {
-  const _MediaTypeChip({required this.item});
-
   final HomeBannerItem item;
+
+  const _MediaTypeChip({required this.item});
 
   @override
   Widget build(BuildContext context) {
@@ -286,17 +285,17 @@ class _MediaTypeChip extends StatelessWidget {
 }
 
 class _TagChip extends StatelessWidget {
+  final String label;
+  final Color backgroundColor;
+  final Color foregroundColor;
+  final IconData? icon;
+
   const _TagChip({
     required this.label,
     required this.backgroundColor,
     required this.foregroundColor,
     this.icon,
   });
-
-  final String label;
-  final Color backgroundColor;
-  final Color foregroundColor;
-  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {

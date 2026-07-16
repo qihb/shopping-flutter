@@ -8,17 +8,17 @@ import 'package:my_first_app/app/config/app_environment.dart';
 /// - 接口基础地址是什么
 /// - 是否打开调试辅助能力
 class AppConfig {
+  final AppEnvironment environment;
+  final String appName;
+  final String apiBaseUrl;
+  final bool enableDebugTools;
+
   const AppConfig({
     required this.environment,
     required this.appName,
     required this.apiBaseUrl,
     required this.enableDebugTools,
   });
-
-  final AppEnvironment environment;
-  final String appName;
-  final String apiBaseUrl;
-  final bool enableDebugTools;
 
   /// 把 JSON 配置转换成 Dart 对象。
   ///

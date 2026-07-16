@@ -13,10 +13,7 @@ import 'package:my_first_app/app/config/app_config_store.dart';
 /// 3. `runApp(app)`：把传进来的根组件显示出来。
 ///
 /// 后面如果你要接入本地存储、读取配置、初始化网络库，也可以继续放在这里。
-Future<void> bootstrap(
-  Widget app, {
-  AppConfigLoader? configLoader,
-}) async {
+Future<void> bootstrap(Widget app, {AppConfigLoader? configLoader}) async {
   WidgetsFlutterBinding.ensureInitialized();
   final AppConfigLoader loader = configLoader ?? const AppConfigLoader();
   final config = await loader.load();

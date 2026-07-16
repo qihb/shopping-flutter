@@ -9,9 +9,9 @@ import 'package:my_first_app/features/home/presentation/widgets/home_banner_vide
 /// 这里先用一个独立页面承接轮播卡片点击后的去向，
 /// 方便后续继续扩展成活动页、专题页或商品聚合页。
 class HomeBannerDetailPage extends StatelessWidget {
-  const HomeBannerDetailPage({super.key, required this.item});
-
   final HomeBannerItem item;
+
+  const HomeBannerDetailPage({super.key, required this.item});
 
   @override
   Widget build(BuildContext context) {
@@ -39,13 +39,16 @@ class HomeBannerDetailPage extends StatelessWidget {
             children: [
               _DetailChip(label: item.mediaTypeLabel),
               _DetailChip(label: item.subtitle),
-              if (item.durationLabel != null) _DetailChip(label: item.durationLabel!),
+              if (item.durationLabel != null)
+                _DetailChip(label: item.durationLabel!),
             ],
           ),
           const SizedBox(height: 16),
           Text(
             item.title,
-            style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+            style: textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
@@ -65,10 +68,7 @@ class HomeBannerDetailPage extends StatelessWidget {
             style: textTheme.bodyMedium?.copyWith(height: 1.6),
           ),
           const SizedBox(height: 24),
-          FilledButton(
-            onPressed: () {},
-            child: const Text('立即购买同款'),
-          ),
+          FilledButton(onPressed: () {}, child: const Text('立即购买同款')),
         ],
       ),
     );
@@ -76,9 +76,9 @@ class HomeBannerDetailPage extends StatelessWidget {
 }
 
 class _DetailChip extends StatelessWidget {
-  const _DetailChip({required this.label});
-
   final String label;
+
+  const _DetailChip({required this.label});
 
   @override
   Widget build(BuildContext context) {

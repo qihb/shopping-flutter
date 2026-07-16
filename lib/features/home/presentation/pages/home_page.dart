@@ -23,11 +23,6 @@ import 'package:my_first_app/features/home/presentation/pages/product_detail_pag
 /// 这里改成 `StatefulWidget`，
 /// 是因为“推荐商品是否还在加载、已经加载到第几页”都属于页面里的本地状态。
 class HomePage extends StatefulWidget {
-  const HomePage({
-    super.key,
-    this.onCategoryTap,
-  });
-
   static const List<_HomeCategoryItem> _categories = [
     _HomeCategoryItem(label: '服饰', icon: Icons.checkroom_outlined),
     _HomeCategoryItem(label: '鞋靴', icon: Icons.hiking_outlined),
@@ -42,6 +37,9 @@ class HomePage extends StatefulWidget {
   /// 这里把点击结果往外抛，是为了让外层主页面决定：
   /// 当前是切 Tab、打开新页，还是做别的跳转承接。
   final ValueChanged<String>? onCategoryTap;
+  final ValueChanged<HomeRecommendProduct>? onAddToCart;
+
+  const HomePage({super.key, this.onCategoryTap, this.onAddToCart});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -147,7 +145,10 @@ class _HomePageState extends State<HomePage> {
     // 对 Flutter 初学者来说，可以先把它理解成“从列表进入一个新页面”。
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => ProductDetailPage(product: product),
+        builder: (_) => ProductDetailPage(
+          product: product,
+          onAddToCart: () => widget.onAddToCart?.call(product),
+        ),
       ),
     );
   }
@@ -188,7 +189,8 @@ class _HomePageState extends State<HomePage> {
                           .map(
                             (item) => _HomeCategoryChip(
                               item: item,
-                              onTap: () => widget.onCategoryTap?.call(item.label),
+                              onTap: () =>
+                                  widget.onCategoryTap?.call(item.label),
                             ),
                           )
                           .toList(),
@@ -245,6 +247,8 @@ class _HomePageState extends State<HomePage> {
 /// 这里暂时不接真实输入框，而是先做成一个可视化搜索入口，
 /// 方便后续再学习表单输入和搜索交互。
 class _HomeSearchBar extends StatelessWidget {
+  const _HomeSearchBar();
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -257,10 +261,7 @@ class _HomeSearchBar extends StatelessWidget {
         children: [
           const Icon(Icons.search),
           const SizedBox(width: 12),
-          Text(
-            '搜一搜你感兴趣的商品',
-            style: Theme.of(context).textTheme.bodyLarge,
-          ),
+          Text('搜一搜你感兴趣的商品', style: Theme.of(context).textTheme.bodyLarge),
         ],
       ),
     );
@@ -272,10 +273,10 @@ class _HomeSearchBar extends StatelessWidget {
 /// 首页通常由多个 section 组成，把标题样式提出来后，
 /// 后续新增区块时可以复用同一套视觉结构。
 class _HomeSectionTitle extends StatelessWidget {
-  const _HomeSectionTitle({required this.title, required this.subtitle});
-
   final String title;
   final String subtitle;
+
+  const _HomeSectionTitle({required this.title, required this.subtitle});
 
   @override
   Widget build(BuildContext context) {
@@ -416,13 +417,10 @@ class _RecommendLoadMoreFinished extends StatelessWidget {
 /// 这里用 `Wrap` 包裹多个卡片，可以在空间不够时自动换行。
 /// 这很适合做数量不多、需要平铺展示的入口按钮。
 class _HomeCategoryChip extends StatelessWidget {
-  const _HomeCategoryChip({
-    required this.item,
-    required this.onTap,
-  });
-
   final _HomeCategoryItem item;
   final VoidCallback onTap;
+
+  const _HomeCategoryChip({required this.item, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -456,8 +454,8 @@ class _HomeCategoryChip extends StatelessWidget {
 /// 这里先用一个很轻量的类来描述首页分类项，
 /// 比直接在页面里写多组散落的字符串更容易维护。
 class _HomeCategoryItem {
-  const _HomeCategoryItem({required this.label, required this.icon});
-
   final String label;
   final IconData icon;
+
+  const _HomeCategoryItem({required this.label, required this.icon});
 }

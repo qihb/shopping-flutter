@@ -69,6 +69,117 @@
 - 不要把网络请求、复杂状态处理直接塞进页面 widget。
 - 主题、颜色、间距、通用样式优先收敛到应用层，不要在页面里散落硬编码。
 
+### 5.1 团队统一书写顺序
+
+为了让当前项目更适合学习、也更方便多人协作，后续类内成员顺序统一采用“先看结构，再看创建，再看行为”的方式。
+
+默认原则：
+
+- 读一个类时，优先先看到“它保存了什么数据”。
+- 再看到“它是怎么被创建出来的”。
+- 最后再看“它能做什么”。
+
+这样做的原因是：对于 Flutter 初学者来说，先看字段更容易先建立对象结构，再理解构造函数里的 `this.xxx`、命名参数、`factory`、`copyWith()` 等写法。
+
+### 5.2 数据类（Model）推荐顺序
+
+普通数据类默认按下面顺序组织：
+
+1. `static const` / `static final`
+2. 实例字段（通常是 `final`）
+3. `const` 构造函数
+4. `factory` 构造函数
+5. getter / 计算属性
+6. 公共方法，例如 `copyWith()`
+7. 私有静态辅助方法，例如解析方法
+
+推荐示例：
+
+```dart
+class CartItem {
+  final String name;
+  final int quantity;
+
+  const CartItem({
+    required this.name,
+    required this.quantity,
+  });
+
+  factory CartItem.fromProduct(Product product) {
+    return CartItem(
+      name: product.name,
+      quantity: 1,
+    );
+  }
+
+  int get totalCount => quantity;
+
+  CartItem copyWith({int? quantity}) {
+    return CartItem(
+      name: name,
+      quantity: quantity ?? this.quantity,
+    );
+  }
+}
+```
+
+补充说明：
+
+- 如果一个类几乎只有构造函数和字段，也优先字段在前、构造函数在后。
+- 只有当某个类非常依赖静态工厂入口，且团队明确约定需要先强调创建方式时，才考虑把 `factory` 提前。
+
+### 5.3 Widget 类推荐顺序
+
+`StatelessWidget` 默认按下面顺序组织：
+
+1. `static const` / `static final`
+2. 实例字段
+3. `const` 构造函数
+4. getter（如果有）
+5. 私有辅助方法
+6. `build()`
+
+`StatefulWidget` 与 `State` 默认按下面顺序组织：
+
+1. `static const` / `static final`
+2. 实例字段
+3. 构造函数
+4. 生命周期方法，例如 `initState()`、`dispose()`、`didUpdateWidget()`
+5. 公开交互方法
+6. 私有辅助方法
+7. `build()`
+
+说明：
+
+- `build()` 一般放在类靠后的位置，因为它通常依赖前面已经声明好的状态和辅助方法。
+- 如果某个 `build()` 很长，优先拆私有 widget 或私有方法，而不是继续堆大段布局。
+
+### 5.4 `const` 与 `final` 的使用规则
+
+- 字段在创建后不再变化时，优先使用 `final`。
+- Widget 构造函数如果满足条件，优先写成 `const`。
+- 私有小组件如果没有可变状态，优先补 `const` 构造函数。
+- 不要为了“看起来更高级”强行加复杂不可变封装；当前阶段以清晰为第一优先级。
+
+### 5.5 注释与布局规则补充
+
+- 文档注释优先写在类、构造函数、关键方法前。
+- 行内注释只解释“为什么这样写”或“这段结构在 Flutter 里起什么作用”。
+- 同一类里的字段、构造函数、方法之间保留清晰空行，让层次一眼能看出来。
+- 如果一个类已经出现“字段、构造函数、方法来回穿插”的情况，优先按本节顺序整理。
+
+### 5.6 AI 代码生成后的复核要求
+
+后续无论是 AI 还是团队成员新增代码，生成后都需要按这份顺序自检一次：
+
+- 类内成员顺序是否符合本规范
+- 是否存在字段和构造函数穿插，导致阅读路径跳跃
+- 是否有可以自然补上的 `const`
+- 是否补上了必要的学习型注释
+- 是否为了追求抽象而牺牲了当前项目的可理解性
+
+如果发现不符合上述规范，应优先在提交前整理，而不是把风格差异继续累积到后续文件里。
+
 ## 6. 学习型注释规范
 
 这个项目有一个非常重要的特殊要求：
