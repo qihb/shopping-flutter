@@ -25,6 +25,7 @@ class RecommendProductCard extends StatelessWidget {
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
+        key: ValueKey<String>('home-product-card-$name'),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(16),

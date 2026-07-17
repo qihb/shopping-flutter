@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:my_first_app/features/order/presentation/models/order_record.dart';
 import 'package:my_first_app/features/order/presentation/pages/order_record_page.dart';
 import 'package:my_first_app/features/profile/presentation/models/profile_settings.dart';
+import 'package:my_first_app/features/profile/presentation/models/user_address.dart';
 import 'package:my_first_app/features/profile/presentation/models/user_profile_summary.dart';
+import 'package:my_first_app/features/profile/presentation/pages/address_management_page.dart';
 
 /// 我的页面。
 ///
@@ -11,8 +13,11 @@ import 'package:my_first_app/features/profile/presentation/models/user_profile_s
 /// 这一版先承接“订单查看”这条链路，后面再继续补个人信息和基础设置。
 class ProfilePage extends StatelessWidget {
   final UserProfileSummary profile;
+  final List<UserAddress> addresses;
   final ProfileSettings settings;
   final List<OrderRecord> orders;
+  final ValueChanged<OrderRecord>? onAdvanceOrderStatus;
+  final ValueChanged<UserAddress>? onSetDefaultAddress;
   final ValueChanged<bool>? onNotificationChanged;
   final ValueChanged<bool>? onBiometricUnlockChanged;
   final ValueChanged<bool>? onPriceAlertChanged;
@@ -20,8 +25,11 @@ class ProfilePage extends StatelessWidget {
   const ProfilePage({
     super.key,
     required this.profile,
+    this.addresses = const <UserAddress>[],
     required this.settings,
     this.orders = const <OrderRecord>[],
+    this.onAdvanceOrderStatus,
+    this.onSetDefaultAddress,
     this.onNotificationChanged,
     this.onBiometricUnlockChanged,
     this.onPriceAlertChanged,
@@ -37,7 +45,10 @@ class ProfilePage extends StatelessWidget {
         children: [
           _ProfileHeaderCard(profile: profile),
           const SizedBox(height: 20),
-          _OrderStatusOverview(orders: orders),
+          _OrderStatusOverview(
+            orders: orders,
+            onAdvanceOrderStatus: onAdvanceOrderStatus,
+          ),
           const SizedBox(height: 20),
           Text('最近订单', style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 16),
@@ -45,6 +56,11 @@ class ProfilePage extends StatelessWidget {
             _ProfileEmptyOrderCard()
           else
             _ProfileLatestOrderCard(order: latestOrder),
+          const SizedBox(height: 20),
+          _ProfileAddressSection(
+            addresses: addresses,
+            onSetDefaultAddress: onSetDefaultAddress,
+          ),
           const SizedBox(height: 20),
           _ProfileSettingsSection(
             settings: settings,
@@ -109,16 +125,23 @@ class _ProfileHeaderCard extends StatelessWidget {
 
 class _OrderStatusOverview extends StatelessWidget {
   final List<OrderRecord> orders;
+  final ValueChanged<OrderRecord>? onAdvanceOrderStatus;
 
-  const _OrderStatusOverview({required this.orders});
+  const _OrderStatusOverview({
+    required this.orders,
+    this.onAdvanceOrderStatus,
+  });
 
   void _openOrderRecordPage(BuildContext context, String statusLabel) {
     // `Navigator.push` 可以先类比成网页里的“进入下一层详情页”。
     // 这里点击订单状态后，会打开一个新的订单记录页面。
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (context) =>
-            OrderRecordPage(orders: orders, initialStatusLabel: statusLabel),
+        builder: (context) => OrderRecordPage(
+          orders: orders,
+          initialStatusLabel: statusLabel,
+          onAdvanceOrderStatus: onAdvanceOrderStatus,
+        ),
       ),
     );
   }
@@ -126,13 +149,28 @@ class _OrderStatusOverview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final List<_OrderStatusItem> statusItems = [
-      _OrderStatusItem(label: '待付款', count: 0),
       _OrderStatusItem(
-        label: '待发货',
-        count: orders.where((order) => order.statusLabel == '待发货').length,
+        label: OrderStatus.pendingPayment.label,
+        count: orders
+            .where((order) => order.status == OrderStatus.pendingPayment)
+            .length,
       ),
-      _OrderStatusItem(label: '待收货', count: 0),
-      _OrderStatusItem(label: '已完成', count: 0),
+      _OrderStatusItem(
+        label: OrderStatus.pendingShipment.label,
+        count: orders
+            .where((order) => order.status == OrderStatus.pendingShipment)
+            .length,
+      ),
+      _OrderStatusItem(
+        label: OrderStatus.pendingDelivery.label,
+        count: orders
+            .where((order) => order.status == OrderStatus.pendingDelivery)
+            .length,
+      ),
+      _OrderStatusItem(
+        label: OrderStatus.completed.label,
+        count: orders.where((order) => order.status == OrderStatus.completed).length,
+      ),
     ];
 
     return Column(
@@ -266,6 +304,11 @@ class _ProfileLatestOrderCard extends StatelessWidget {
               context,
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
+          const SizedBox(height: 8),
+          Text(
+            '地址 ${order.shippingAddressLabel}',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
         ],
       ),
     );
@@ -329,6 +372,81 @@ class _ProfileSettingsSection extends StatelessWidget {
                   onChanged: onPriceAlertChanged,
                 ),
               ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProfileAddressSection extends StatelessWidget {
+  final List<UserAddress> addresses;
+  final ValueChanged<UserAddress>? onSetDefaultAddress;
+
+  const _ProfileAddressSection({
+    required this.addresses,
+    this.onSetDefaultAddress,
+  });
+
+  void _openAddressManagementPage(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => AddressManagementPage(
+          addresses: addresses,
+          onSetDefaultAddress: onSetDefaultAddress,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final UserAddress? defaultAddress = addresses.isEmpty
+        ? null
+        : addresses.firstWhere((address) => address.isDefault);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('地址管理', style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: 12),
+        Material(
+          color: Theme.of(context).colorScheme.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(20),
+          child: InkWell(
+            key: const ValueKey<String>('profile-address-manage-entry'),
+            borderRadius: BorderRadius.circular(20),
+            onTap: () => _openAddressManagementPage(context),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '默认地址 ${defaultAddress?.fullAddress ?? '暂未设置'}',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          defaultAddress == null
+                              ? '后续可以在这里维护多个收货地址'
+                              : '${defaultAddress.recipientName} ${defaultAddress.phone}',
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right,
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+                ],
+              ),
             ),
           ),
         ),

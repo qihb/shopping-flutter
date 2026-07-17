@@ -84,6 +84,7 @@ class ProductDetailPage extends StatelessWidget {
             children: [
               Expanded(
                 child: OutlinedButton(
+                  key: const ValueKey<String>('product-detail-add-to-cart'),
                   onPressed: () {
                     onAddToCart?.call();
                     Navigator.of(context).pop();
@@ -94,6 +95,7 @@ class ProductDetailPage extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: FilledButton(
+                  key: const ValueKey<String>('product-detail-buy-now'),
                   onPressed: () {},
                   child: const Text('立即购买'),
                 ),

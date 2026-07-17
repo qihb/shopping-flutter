@@ -10,6 +10,8 @@ class CartPage extends StatelessWidget {
   final List<CartItem> items;
   final ValueChanged<CartItem>? onIncreaseQuantity;
   final ValueChanged<CartItem>? onDecreaseQuantity;
+  final ValueChanged<CartItem>? onRemoveItem;
+  final VoidCallback? onClearCart;
   final VoidCallback? onSubmitOrder;
 
   const CartPage({
@@ -17,6 +19,8 @@ class CartPage extends StatelessWidget {
     this.items = const <CartItem>[],
     this.onIncreaseQuantity,
     this.onDecreaseQuantity,
+    this.onRemoveItem,
+    this.onClearCart,
     this.onSubmitOrder,
   });
 
@@ -48,9 +52,29 @@ class CartPage extends StatelessWidget {
     return SafeArea(
       child: Column(
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '购物车商品 ${items.length} 件',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  key: const ValueKey<String>('cart-clear-all'),
+                  onPressed: onClearCart,
+                  child: const Text('清空购物车'),
+                ),
+              ],
+            ),
+          ),
           Expanded(
             child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               itemBuilder: (context, index) {
                 final CartItem item = items[index];
 
@@ -58,6 +82,7 @@ class CartPage extends StatelessWidget {
                   item: item,
                   onIncreaseQuantity: onIncreaseQuantity,
                   onDecreaseQuantity: onDecreaseQuantity,
+                  onRemoveItem: onRemoveItem,
                 );
               },
               separatorBuilder: (_, _) => const SizedBox(height: 12),
@@ -85,6 +110,7 @@ class CartPage extends StatelessWidget {
                   ),
                 ),
                 FilledButton(
+                  key: const ValueKey<String>('cart-submit-order'),
                   onPressed: onSubmitOrder,
                   child: const Text('提交订单'),
                 ),
@@ -101,11 +127,13 @@ class _CartItemCard extends StatelessWidget {
   final CartItem item;
   final ValueChanged<CartItem>? onIncreaseQuantity;
   final ValueChanged<CartItem>? onDecreaseQuantity;
+  final ValueChanged<CartItem>? onRemoveItem;
 
   const _CartItemCard({
     required this.item,
     this.onIncreaseQuantity,
     this.onDecreaseQuantity,
+    this.onRemoveItem,
   });
 
   @override
@@ -151,6 +179,14 @@ class _CartItemCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
+                  item.totalPriceLabel,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
                   '数量 x${item.quantity}',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: colorScheme.onSurfaceVariant,
@@ -172,6 +208,13 @@ class _CartItemCard extends StatelessWidget {
                       key: ValueKey<String>('cart-increase-${item.name}'),
                       onPressed: () => onIncreaseQuantity?.call(item),
                       icon: const Icon(Icons.add_circle_outline),
+                    ),
+                    const Spacer(),
+                    TextButton.icon(
+                      key: ValueKey<String>('cart-delete-${item.name}'),
+                      onPressed: () => onRemoveItem?.call(item),
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text('删除'),
                     ),
                   ],
                 ),

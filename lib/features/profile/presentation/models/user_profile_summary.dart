@@ -14,4 +14,18 @@ class UserProfileSummary {
     required this.memberLabel,
     required this.defaultAddress,
   });
+
+  UserProfileSummary copyWith({
+    String? displayName,
+    String? email,
+    String? memberLabel,
+    String? defaultAddress,
+  }) {
+    return UserProfileSummary(
+      displayName: displayName ?? this.displayName,
+      email: email ?? this.email,
+      memberLabel: memberLabel ?? this.memberLabel,
+      defaultAddress: defaultAddress ?? this.defaultAddress,
+    );
+  }
 }

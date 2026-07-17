@@ -63,9 +63,15 @@ void main() {
     await tester.tap(find.text('我的'));
     await tester.pumpAndSettle();
     expect(find.text('Hi, Qi Hai Bing'), findsOneWidget);
-    expect(find.text('订单状态'), findsOneWidget);
-    expect(find.text('待付款'), findsOneWidget);
-    expect(find.text('待发货'), findsOneWidget);
+    expect(find.text('订单状态'), findsWidgets);
+    expect(find.text('待付款'), findsWidgets);
+    expect(find.text('待发货'), findsWidgets);
+    await tester.scrollUntilVisible(
+      find.text('基础设置'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     expect(find.text('基础设置'), findsOneWidget);
   });
 
