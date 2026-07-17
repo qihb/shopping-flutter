@@ -5,11 +5,7 @@ import 'package:my_first_app/app/presentation/pages/main_tab_page.dart';
 
 void main() {
   testWidgets('从首页点击分类入口后会切到分类页并选中对应分类', (WidgetTester tester) async {
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: MainTabPage(),
-      ),
-    );
+    await tester.pumpWidget(const MaterialApp(home: MainTabPage()));
 
     await tester.scrollUntilVisible(
       find.text('鞋靴'),
@@ -26,11 +22,7 @@ void main() {
   });
 
   testWidgets('从商品详情加入购物车后会在购物车页看到对应商品', (WidgetTester tester) async {
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: MainTabPage(),
-      ),
-    );
+    await tester.pumpWidget(const MaterialApp(home: MainTabPage()));
 
     await tester.pump(const Duration(milliseconds: 500));
     await tester.scrollUntilVisible(
@@ -59,11 +51,7 @@ void main() {
   });
 
   testWidgets('购物车里修改商品数量后会同步更新数量和合计金额', (WidgetTester tester) async {
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: MainTabPage(),
-      ),
-    );
+    await tester.pumpWidget(const MaterialApp(home: MainTabPage()));
 
     await tester.pump(const Duration(milliseconds: 500));
     await tester.scrollUntilVisible(
@@ -104,11 +92,7 @@ void main() {
   });
 
   testWidgets('从购物车提交订单后会生成订单并在我的页面显示状态', (WidgetTester tester) async {
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: MainTabPage(),
-      ),
-    );
+    await tester.pumpWidget(const MaterialApp(home: MainTabPage()));
 
     await tester.pump(const Duration(milliseconds: 500));
     await tester.scrollUntilVisible(
@@ -141,11 +125,7 @@ void main() {
   });
 
   testWidgets('我的页面切换基础设置后会更新当前状态文案', (WidgetTester tester) async {
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: MainTabPage(),
-      ),
-    );
+    await tester.pumpWidget(const MaterialApp(home: MainTabPage()));
 
     await tester.tap(find.text('我的'));
     await tester.pumpAndSettle();
@@ -167,12 +147,51 @@ void main() {
     expect(find.text('消息通知: 已关闭'), findsOneWidget);
   });
 
-  testWidgets('从分类页进入详情并加入购物车后会在购物车看到商品', (WidgetTester tester) async {
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: MainTabPage(),
-      ),
+  testWidgets('点击每个订单状态后都会跳转到订单记录页', (WidgetTester tester) async {
+    await tester.pumpWidget(const MaterialApp(home: MainTabPage()));
+
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.scrollUntilVisible(
+      find.text('夏季轻运动鞋'),
+      200,
+      scrollable: find.byType(Scrollable).first,
     );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('夏季轻运动鞋'));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('加入购物车'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('加入购物车'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('提交订单'));
+    await tester.pumpAndSettle();
+
+    final List<String> orderStatusLabels = <String>['待付款', '待发货', '待收货', '已完成'];
+
+    for (final String statusLabel in orderStatusLabels) {
+      await tester.tap(
+        find.byKey(ValueKey<String>('profile-order-status-$statusLabel')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('订单记录'), findsOneWidget);
+      expect(find.text('当前筛选：$statusLabel'), findsOneWidget);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+    }
+  });
+
+  testWidgets('从分类页进入详情并加入购物车后会在购物车看到商品', (WidgetTester tester) async {
+    await tester.pumpWidget(const MaterialApp(home: MainTabPage()));
 
     await tester.tap(find.text('分类'));
     await tester.pumpAndSettle();

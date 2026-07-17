@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:my_first_app/features/order/presentation/models/order_record.dart';
+import 'package:my_first_app/features/order/presentation/pages/order_record_page.dart';
 import 'package:my_first_app/features/profile/presentation/models/profile_settings.dart';
 import 'package:my_first_app/features/profile/presentation/models/user_profile_summary.dart';
 
@@ -111,6 +112,17 @@ class _OrderStatusOverview extends StatelessWidget {
 
   const _OrderStatusOverview({required this.orders});
 
+  void _openOrderRecordPage(BuildContext context, String statusLabel) {
+    // `Navigator.push` 可以先类比成网页里的“进入下一层详情页”。
+    // 这里点击订单状态后，会打开一个新的订单记录页面。
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) =>
+            OrderRecordPage(orders: orders, initialStatusLabel: statusLabel),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final List<_OrderStatusItem> statusItems = [
@@ -129,39 +141,47 @@ class _OrderStatusOverview extends StatelessWidget {
         Text('订单状态', style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 12),
         Row(
-          children: statusItems
-              .map(
-                (item) => Expanded(
-                  child: Container(
-                    margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 14,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.surfaceContainerLowest,
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          item.label,
-                          style: Theme.of(context).textTheme.titleSmall,
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          '${item.count}',
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                      ],
+          children: statusItems.asMap().entries.map((entry) {
+            final int index = entry.key;
+            final _OrderStatusItem item = entry.value;
+
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  right: index == statusItems.length - 1 ? 0 : 8,
+                ),
+                child: Material(
+                  color: Theme.of(context).colorScheme.surfaceContainerLowest,
+                  borderRadius: BorderRadius.circular(18),
+                  child: InkWell(
+                    key: ValueKey<String>('profile-order-status-${item.label}'),
+                    borderRadius: BorderRadius.circular(18),
+                    onTap: () => _openOrderRecordPage(context, item.label),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 14,
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            item.label,
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            '${item.count}',
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              )
-              .toList(),
+              ),
+            );
+          }).toList(),
         ),
       ],
     );
