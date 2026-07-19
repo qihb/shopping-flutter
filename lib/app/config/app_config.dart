@@ -12,12 +12,20 @@ class AppConfig {
   final String appName;
   final String apiBaseUrl;
   final bool enableDebugTools;
+  final bool enableRealPayment;
+  final String alipayAppId;
+  final String wechatAppId;
+  final String wechatUniversalLink;
 
   const AppConfig({
     required this.environment,
     required this.appName,
     required this.apiBaseUrl,
     required this.enableDebugTools,
+    required this.enableRealPayment,
+    required this.alipayAppId,
+    required this.wechatAppId,
+    required this.wechatUniversalLink,
   });
 
   /// 把 JSON 配置转换成 Dart 对象。
@@ -33,6 +41,10 @@ class AppConfig {
       appName: json['appName'] as String? ?? 'My First App',
       apiBaseUrl: json['apiBaseUrl'] as String? ?? '',
       enableDebugTools: json['enableDebugTools'] as bool? ?? false,
+      enableRealPayment: json['enableRealPayment'] as bool? ?? false,
+      alipayAppId: json['alipayAppId'] as String? ?? '',
+      wechatAppId: json['wechatAppId'] as String? ?? '',
+      wechatUniversalLink: json['wechatUniversalLink'] as String? ?? '',
     );
   }
 }

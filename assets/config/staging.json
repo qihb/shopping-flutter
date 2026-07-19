@@ -1,5 +1,9 @@
 {
   "appName": "My First App Staging",
   "apiBaseUrl": "https://staging-api.example.com",
-  "enableDebugTools": true
+  "enableDebugTools": true,
+  "enableRealPayment": false,
+  "alipayAppId": "mock-staging-alipay-app-id",
+  "wechatAppId": "mock-staging-wechat-app-id",
+  "wechatUniversalLink": "https://example.com/staging/wechat/link/"
 }

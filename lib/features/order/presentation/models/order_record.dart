@@ -142,7 +142,7 @@ class OrderRecord {
     return OrderRecord(
       id: id,
       items: orderItems,
-      status: OrderStatus.pendingShipment,
+      status: OrderStatus.pendingPayment,
       totalPrice: totalPrice,
       shippingAddress: shippingAddress,
     );

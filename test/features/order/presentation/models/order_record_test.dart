@@ -32,8 +32,8 @@ void main() {
     );
 
     expect(order.id, 'ORD-0000001');
-    expect(order.status, OrderStatus.pendingShipment);
-    expect(order.statusLabel, '待发货');
+    expect(order.status, OrderStatus.pendingPayment);
+    expect(order.statusLabel, '待付款');
     expect(order.totalPrice, 307);
     expect(order.totalPriceLabel, 'EUR 307');
     expect(order.shippingAddressLabel, '上海市浦东新区张江高科');

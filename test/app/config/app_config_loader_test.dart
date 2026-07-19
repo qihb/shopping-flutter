@@ -33,6 +33,10 @@ void main() {
             'appName': 'My First App Staging',
             'apiBaseUrl': 'https://staging-api.example.com',
             'enableDebugTools': true,
+            'enableRealPayment': false,
+            'alipayAppId': 'mock-alipay-app-id',
+            'wechatAppId': 'mock-wechat-app-id',
+            'wechatUniversalLink': 'https://example.com/wechat/link/',
           }),
         }),
         environmentValue: 'staging',
@@ -44,6 +48,10 @@ void main() {
       expect(config.appName, 'My First App Staging');
       expect(config.apiBaseUrl, 'https://staging-api.example.com');
       expect(config.enableDebugTools, isTrue);
+      expect(config.enableRealPayment, isFalse);
+      expect(config.alipayAppId, 'mock-alipay-app-id');
+      expect(config.wechatAppId, 'mock-wechat-app-id');
+      expect(config.wechatUniversalLink, 'https://example.com/wechat/link/');
     });
   });
 
@@ -59,6 +67,10 @@ void main() {
               'appName': 'My First App',
               'apiBaseUrl': 'https://api.example.com',
               'enableDebugTools': false,
+            'enableRealPayment': false,
+            'alipayAppId': 'prod-alipay-app-id',
+            'wechatAppId': 'prod-wechat-app-id',
+            'wechatUniversalLink': 'https://example.com/prod/link/',
             }),
           }),
           environmentValue: 'prod',
@@ -69,6 +81,12 @@ void main() {
       expect(find.byKey(const ValueKey<String>('bootstrapped-app')), findsOneWidget);
       expect(AppConfigStore.instance.environment, AppEnvironment.prod);
       expect(AppConfigStore.instance.apiBaseUrl, 'https://api.example.com');
+      expect(AppConfigStore.instance.enableRealPayment, isFalse);
+      expect(AppConfigStore.instance.alipayAppId, 'prod-alipay-app-id');
+      expect(
+        AppConfigStore.instance.wechatUniversalLink,
+        'https://example.com/prod/link/',
+      );
     });
   });
 }

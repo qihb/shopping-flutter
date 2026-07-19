@@ -173,7 +173,7 @@ class _MainTabPageState extends State<MainTabPage> {
         builder: (context) => OrderConfirmPage(
           items: _cartItems,
           address: _defaultAddress,
-          onConfirmPayment: () {
+          onConfirmPayment: (_) async {
             _submitOrder();
             Navigator.of(context).pop();
           },
@@ -191,7 +191,7 @@ class _MainTabPageState extends State<MainTabPage> {
       id: 'ORD-${(_orders.length + 1).toString().padLeft(7, '0')}',
       items: _cartItems,
       shippingAddress: _defaultAddress,
-    );
+    ).advanceStatus();
 
     setState(() {
       _orders.insert(0, order);

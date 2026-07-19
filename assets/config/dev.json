@@ -1,5 +1,9 @@
 {
   "appName": "My First App Dev",
   "apiBaseUrl": "https://dev-api.example.com",
-  "enableDebugTools": true
+  "enableDebugTools": true,
+  "enableRealPayment": false,
+  "alipayAppId": "mock-dev-alipay-app-id",
+  "wechatAppId": "mock-dev-wechat-app-id",
+  "wechatUniversalLink": "https://example.com/dev/wechat/link/"
 }

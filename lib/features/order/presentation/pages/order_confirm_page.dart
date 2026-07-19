@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 
 import 'package:my_first_app/features/cart/presentation/models/cart_item.dart';
+import 'package:my_first_app/features/payment/presentation/models/payment_method.dart';
 import 'package:my_first_app/features/profile/presentation/models/user_address.dart';
 
 /// 订单确认页。
 ///
 /// 它位于“购物车”和“订单生成”之间，
 /// 作用可以先理解成网页结算页里的“最后确认信息”步骤。
-class OrderConfirmPage extends StatelessWidget {
+///
+/// 这里改成 `StatefulWidget`，是因为“当前选中了哪种支付方式”
+/// 属于页面内部的本地交互状态。
+class OrderConfirmPage extends StatefulWidget {
   final List<CartItem> items;
   final UserAddress address;
-  final VoidCallback onConfirmPayment;
+  final Future<void> Function(PaymentMethod method) onConfirmPayment;
 
   const OrderConfirmPage({
     super.key,
@@ -20,8 +24,25 @@ class OrderConfirmPage extends StatelessWidget {
   });
 
   @override
+  State<OrderConfirmPage> createState() => _OrderConfirmPageState();
+}
+
+class _OrderConfirmPageState extends State<OrderConfirmPage> {
+  PaymentMethod _selectedPaymentMethod = PaymentMethod.alipay;
+
+  void _selectPaymentMethod(PaymentMethod method) {
+    setState(() {
+      _selectedPaymentMethod = method;
+    });
+  }
+
+  Future<void> _handleConfirmPayment() async {
+    await widget.onConfirmPayment(_selectedPaymentMethod);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final int totalPrice = items.fold<int>(
+    final int totalPrice = widget.items.fold<int>(
       0,
       (sum, item) => sum + item.totalPrice,
     );
@@ -37,15 +58,15 @@ class OrderConfirmPage extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  address.recipientName,
+                  widget.address.recipientName,
                   style: Theme.of(
                     context,
                   ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 8),
-                Text(address.phone),
+                Text(widget.address.phone),
                 const SizedBox(height: 8),
-                Text(address.fullAddress),
+                Text(widget.address.fullAddress),
               ],
             ),
           ),
@@ -53,7 +74,7 @@ class OrderConfirmPage extends StatelessWidget {
           _ConfirmSectionCard(
             title: '商品信息',
             child: Column(
-              children: items
+              children: widget.items
                   .map(
                     (item) => Padding(
                       padding: const EdgeInsets.only(bottom: 12),
@@ -72,9 +93,46 @@ class OrderConfirmPage extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           _ConfirmSectionCard(
+            title: '支付方式',
+            child: Column(
+              children: [
+                RadioListTile<PaymentMethod>(
+                  key: const ValueKey<String>('payment-method-alipay'),
+                  contentPadding: EdgeInsets.zero,
+                  value: PaymentMethod.alipay,
+                  groupValue: _selectedPaymentMethod,
+                  onChanged: (value) {
+                    if (value == null) {
+                      return;
+                    }
+
+                    _selectPaymentMethod(value);
+                  },
+                  title: const Text('支付宝'),
+                ),
+                RadioListTile<PaymentMethod>(
+                  key: const ValueKey<String>('payment-method-wechat'),
+                  contentPadding: EdgeInsets.zero,
+                  value: PaymentMethod.wechatPay,
+                  groupValue: _selectedPaymentMethod,
+                  onChanged: (value) {
+                    if (value == null) {
+                      return;
+                    }
+
+                    _selectPaymentMethod(value);
+                  },
+                  title: const Text('微信支付'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          _ConfirmSectionCard(
             title: '支付说明',
             child: Text(
-              '当前学习阶段先把支付结果固定为成功，重点理解“确认订单 -> 生成订单”的页面承接。',
+              '当前阶段先把支付方式选择和订单状态流转搭起来，'
+              '后续再把真实支付宝 / 微信 SDK 接进来。',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.6),
             ),
           ),
@@ -96,7 +154,7 @@ class OrderConfirmPage extends StatelessWidget {
               ),
               FilledButton(
                 key: const ValueKey<String>('order-confirm-pay'),
-                onPressed: onConfirmPayment,
+                onPressed: _handleConfirmPayment,
                 child: const Text('确认支付'),
               ),
             ],
@@ -131,7 +189,10 @@ class _ConfirmSectionCard extends StatelessWidget {
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 12),
-          child,
+          Material(
+            color: Colors.transparent,
+            child: child,
+          ),
         ],
       ),
     );

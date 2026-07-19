@@ -23,6 +23,10 @@ void main() {
         appName: 'My First App Test',
         apiBaseUrl: 'https://test-api.example.com',
         enableDebugTools: true,
+        enableRealPayment: false,
+        alipayAppId: 'mock-test-alipay-app-id',
+        wechatAppId: 'mock-test-wechat-app-id',
+        wechatUniversalLink: 'https://example.com/test/wechat/link/',
       ),
     );
   });
