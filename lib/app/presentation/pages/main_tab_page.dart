@@ -7,6 +7,11 @@ import 'package:my_first_app/features/home/presentation/models/home_recommend_pr
 import 'package:my_first_app/features/home/presentation/pages/home_page.dart';
 import 'package:my_first_app/features/order/presentation/models/order_record.dart';
 import 'package:my_first_app/features/order/presentation/pages/order_confirm_page.dart';
+import 'package:my_first_app/features/payment/application/payment_service.dart';
+import 'package:my_first_app/features/payment/application/payment_service_factory.dart';
+import 'package:my_first_app/features/payment/data/models/payment_request.dart';
+import 'package:my_first_app/features/payment/presentation/models/payment_method.dart';
+import 'package:my_first_app/features/payment/presentation/models/payment_result.dart';
 import 'package:my_first_app/features/profile/presentation/models/user_address.dart';
 import 'package:my_first_app/features/profile/presentation/models/profile_settings.dart';
 import 'package:my_first_app/features/profile/presentation/models/user_profile_summary.dart';
@@ -17,7 +22,12 @@ import 'package:my_first_app/features/profile/presentation/pages/profile_page.da
 /// 这里使用 `StatefulWidget`，是因为当前选中的菜单索引会变化。
 /// 你可以先把它理解成“页面里有一小块会随点击变化的本地状态”。
 class MainTabPage extends StatefulWidget {
-  const MainTabPage({super.key});
+  final PaymentService? paymentService;
+
+  const MainTabPage({
+    super.key,
+    this.paymentService,
+  });
 
   @override
   State<MainTabPage> createState() => _MainTabPageState();
@@ -55,6 +65,8 @@ class _MainTabPageState extends State<MainTabPage> {
     enableBiometricUnlock: false,
     enablePriceAlert: true,
   );
+  late final PaymentService _paymentService =
+      widget.paymentService ?? PaymentServiceFactory.createMock();
 
   UserAddress get _defaultAddress {
     return _addresses.firstWhere((address) => address.isDefault);
@@ -173,25 +185,60 @@ class _MainTabPageState extends State<MainTabPage> {
         builder: (context) => OrderConfirmPage(
           items: _cartItems,
           address: _defaultAddress,
-          onConfirmPayment: (_) async {
-            _submitOrder();
-            Navigator.of(context).pop();
+          onConfirmPayment: (method) async {
+            await _submitOrder(method);
+            if (!mounted) {
+              return;
+            }
+            Navigator.of(this.context).pop();
           },
         ),
       ),
     );
   }
 
-  void _submitOrder() {
+  Future<bool> _openRepayOrderConfirmPage(OrderRecord order) async {
+    final bool? didSucceed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (context) => OrderConfirmPage(
+          items: order.items,
+          address: order.shippingAddress,
+          onConfirmPayment: (method) async {
+            final bool didSucceed = await _repayOrder(order, method);
+            if (!mounted) {
+              return;
+            }
+            Navigator.of(this.context).pop(didSucceed);
+          },
+        ),
+      ),
+    );
+
+    return didSucceed ?? false;
+  }
+
+  Future<void> _submitOrder(PaymentMethod method) async {
     if (_cartItems.isEmpty) {
       return;
     }
 
-    final OrderRecord order = OrderRecord.fromCartItems(
+    final String orderId = 'ORD-${(_orders.length + 1).toString().padLeft(7, '0')}';
+    final OrderRecord draftOrder = OrderRecord.fromCartItems(
       id: 'ORD-${(_orders.length + 1).toString().padLeft(7, '0')}',
       items: _cartItems,
       shippingAddress: _defaultAddress,
-    ).advanceStatus();
+    );
+    final PaymentResult paymentResult = await _paymentService.pay(
+      PaymentRequest(
+        orderId: orderId,
+        amount: draftOrder.totalPrice,
+        title: draftOrder.items.first.name,
+        method: method,
+      ),
+    );
+    final OrderRecord order = paymentResult.status == PaymentStatus.success
+        ? draftOrder.advanceStatus()
+        : draftOrder;
 
     setState(() {
       _orders.insert(0, order);
@@ -199,7 +246,35 @@ class _MainTabPageState extends State<MainTabPage> {
       _currentIndex = 3;
     });
 
-    _showMessage('支付成功');
+    _showMessage(paymentResult.message);
+  }
+
+  Future<bool> _repayOrder(OrderRecord order, PaymentMethod method) async {
+    final int orderIndex = _orders.indexWhere((item) => item.id == order.id);
+
+    if (orderIndex < 0) {
+      return false;
+    }
+
+    final PaymentResult paymentResult = await _paymentService.pay(
+      PaymentRequest(
+        orderId: order.id,
+        amount: order.totalPrice,
+        title: order.items.first.name,
+        method: method,
+      ),
+    );
+
+    setState(() {
+      if (paymentResult.status == PaymentStatus.success) {
+        _orders[orderIndex] = _orders[orderIndex].advanceStatus();
+      }
+
+      _currentIndex = 3;
+    });
+
+    _showMessage(paymentResult.message);
+    return paymentResult.status == PaymentStatus.success;
   }
 
   void _advanceOrderStatus(OrderRecord order) {
@@ -284,6 +359,7 @@ class _MainTabPageState extends State<MainTabPage> {
         settings: _settings,
         orders: displayOrders,
         onAdvanceOrderStatus: _orders.isEmpty ? null : _advanceOrderStatus,
+        onRepayOrder: _orders.isEmpty ? null : _openRepayOrderConfirmPage,
         onSetDefaultAddress: _setDefaultAddress,
         onNotificationChanged: _updateNotificationSetting,
         onBiometricUnlockChanged: _updateBiometricSetting,

@@ -11,12 +11,14 @@ class OrderRecordPage extends StatefulWidget {
   final List<OrderRecord> orders;
   final String initialStatusLabel;
   final ValueChanged<OrderRecord>? onAdvanceOrderStatus;
+  final Future<bool> Function(OrderRecord order)? onRepayOrder;
 
   const OrderRecordPage({
     super.key,
     required this.orders,
     required this.initialStatusLabel,
     this.onAdvanceOrderStatus,
+    this.onRepayOrder,
   });
 
   @override
@@ -35,6 +37,14 @@ class _OrderRecordPageState extends State<OrderRecordPage> {
     setState(() {});
   }
 
+  Future<void> _handleRepayOrder(OrderRecord order) async {
+    final bool didSucceed = await widget.onRepayOrder?.call(order) ?? false;
+
+    if (didSucceed) {
+      setState(() {});
+    }
+  }
+
   void _openOrderDetail(OrderRecord order) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -46,6 +56,7 @@ class _OrderRecordPageState extends State<OrderRecordPage> {
                   widget.onAdvanceOrderStatus?.call(targetOrder);
                   setState(() {});
                 },
+          onRepayOrder: widget.onRepayOrder,
         ),
       ),
     );
@@ -86,6 +97,9 @@ class _OrderRecordPageState extends State<OrderRecordPage> {
                   onAdvanceOrderStatus: widget.onAdvanceOrderStatus == null
                       ? null
                       : () => _handleAdvanceOrderStatus(order),
+                  onRepayOrder: widget.onRepayOrder == null
+                      ? null
+                      : () => _handleRepayOrder(order),
                 ),
               ),
             ),
@@ -120,11 +134,13 @@ class _OrderRecordCard extends StatelessWidget {
   final OrderRecord order;
   final VoidCallback onTap;
   final VoidCallback? onAdvanceOrderStatus;
+  final VoidCallback? onRepayOrder;
 
   const _OrderRecordCard({
     required this.order,
     required this.onTap,
     this.onAdvanceOrderStatus,
+    this.onRepayOrder,
   });
 
   @override
@@ -179,6 +195,15 @@ class _OrderRecordCard extends StatelessWidget {
                   onPressed: onAdvanceOrderStatus,
                   child: Text('推进到${order.nextStatusLabel}'),
                 ),
+              if (order.status == OrderStatus.pendingPayment &&
+                  onRepayOrder != null) ...[
+                const SizedBox(height: 8),
+                FilledButton(
+                  key: ValueKey<String>('order-repay-${order.id}'),
+                  onPressed: onRepayOrder,
+                  child: const Text('继续支付'),
+                ),
+              ],
             ],
           ),
         ),

@@ -88,6 +88,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  fluwx:
+    dependency: "direct main"
+    description:
+      name: fluwx
+      sha256: c81f75d41ce5d345ccc04005c39aa53de9d5fc9a0f8634438c472324b277169e
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "6.0.0"
   html:
     dependency: transitive
     description:
@@ -221,6 +229,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "0.7.11"
+  tobias:
+    dependency: "direct main"
+    description:
+      name: tobias
+      sha256: "1cfd203bf57f8d4daa3e734d24ef97568eb5265af62d1498c32da4e69905c70f"
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "5.3.4"
   vector_math:
     dependency: transitive
     description:

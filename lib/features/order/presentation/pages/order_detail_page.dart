@@ -10,11 +10,13 @@ import 'package:my_first_app/features/order/presentation/models/order_record.dar
 class OrderDetailPage extends StatefulWidget {
   final OrderRecord order;
   final ValueChanged<OrderRecord>? onAdvanceOrderStatus;
+  final Future<bool> Function(OrderRecord order)? onRepayOrder;
 
   const OrderDetailPage({
     super.key,
     required this.order,
     this.onAdvanceOrderStatus,
+    this.onRepayOrder,
   });
 
   @override
@@ -36,6 +38,18 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     }
 
     widget.onAdvanceOrderStatus?.call(_order);
+    setState(() {
+      _order = _order.advanceStatus();
+    });
+  }
+
+  Future<void> _handleRepayOrder() async {
+    final bool didSucceed = await widget.onRepayOrder?.call(_order) ?? false;
+
+    if (!didSucceed) {
+      return;
+    }
+
     setState(() {
       _order = _order.advanceStatus();
     });
@@ -117,6 +131,15 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
               key: ValueKey<String>('order-detail-advance-${_order.id}'),
               onPressed: _handleAdvanceOrderStatus,
               child: Text('推进到${_order.nextStatusLabel}'),
+            ),
+          ],
+          if (_order.status == OrderStatus.pendingPayment &&
+              widget.onRepayOrder != null) ...[
+            const SizedBox(height: 12),
+            FilledButton(
+              key: ValueKey<String>('order-detail-repay-${_order.id}'),
+              onPressed: _handleRepayOrder,
+              child: const Text('继续支付'),
             ),
           ],
         ],

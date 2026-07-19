@@ -2,6 +2,42 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:my_first_app/app/presentation/pages/main_tab_page.dart';
+import 'package:my_first_app/features/payment/application/payment_gateway.dart';
+import 'package:my_first_app/features/payment/application/payment_service.dart';
+import 'package:my_first_app/features/payment/data/models/payment_request.dart';
+import 'package:my_first_app/features/payment/presentation/models/payment_method.dart';
+import 'package:my_first_app/features/payment/presentation/models/payment_result.dart';
+
+class _RecordingPaymentGateway implements PaymentGateway {
+  PaymentRequest? lastRequest;
+  final PaymentResult result;
+
+  _RecordingPaymentGateway({required this.result});
+
+  @override
+  Future<PaymentResult> pay(PaymentRequest request) async {
+    lastRequest = request;
+    return result;
+  }
+}
+
+class _SequencedPaymentGateway implements PaymentGateway {
+  final List<PaymentResult> results;
+  final List<PaymentRequest> requests = <PaymentRequest>[];
+
+  _SequencedPaymentGateway({required this.results});
+
+  @override
+  Future<PaymentResult> pay(PaymentRequest request) async {
+    requests.add(request);
+
+    if (results.isEmpty) {
+      throw StateError('没有可用的支付结果可供测试消费');
+    }
+
+    return results.removeAt(0);
+  }
+}
 
 Future<void> _addProductToCart(
   WidgetTester tester, {
@@ -41,6 +77,21 @@ Future<void> _submitFirstOrder(WidgetTester tester) async {
   await tester.tap(find.byKey(const ValueKey<String>('cart-submit-order')));
   await tester.pumpAndSettle();
   expect(find.text('订单确认'), findsOneWidget);
+  await tester.tap(find.byKey(const ValueKey<String>('order-confirm-pay')));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _submitFirstOrderWithWechat(WidgetTester tester) async {
+  await _addProductToCart(tester);
+  await tester.pump(const Duration(milliseconds: 1500));
+  await tester.pumpAndSettle();
+  await tester.ensureVisible(find.byKey(const ValueKey<String>('cart-submit-order')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const ValueKey<String>('cart-submit-order')));
+  await tester.pumpAndSettle();
+  expect(find.text('订单确认'), findsOneWidget);
+  await tester.tap(find.byKey(const ValueKey<String>('payment-method-wechat')));
+  await tester.pumpAndSettle();
   await tester.tap(find.byKey(const ValueKey<String>('order-confirm-pay')));
   await tester.pumpAndSettle();
 }
@@ -96,15 +147,140 @@ void main() {
   });
 
   testWidgets('从购物车进入订单确认页后支付成功并在我的页面显示订单', (WidgetTester tester) async {
-    await tester.pumpWidget(const MaterialApp(home: MainTabPage()));
+    final _RecordingPaymentGateway wechatGateway = _RecordingPaymentGateway(
+      result: const PaymentResult(
+        method: PaymentMethod.wechatPay,
+        status: PaymentStatus.success,
+        message: '微信支付成功',
+      ),
+    );
+    final _RecordingPaymentGateway alipayGateway = _RecordingPaymentGateway(
+      result: const PaymentResult(
+        method: PaymentMethod.alipay,
+        status: PaymentStatus.success,
+        message: '支付宝支付成功',
+      ),
+    );
 
-    await _submitFirstOrder(tester);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MainTabPage(
+          paymentService: PaymentService(
+            gateways: <PaymentMethod, PaymentGateway>{
+              PaymentMethod.alipay: alipayGateway,
+              PaymentMethod.wechatPay: wechatGateway,
+            },
+          ),
+        ),
+      ),
+    );
 
-    expect(find.text('支付成功'), findsOneWidget);
+    await _submitFirstOrderWithWechat(tester);
+
+    expect(find.text('微信支付成功'), findsOneWidget);
     expect(find.text('最近订单'), findsOneWidget);
     expect(find.text('订单状态'), findsWidgets);
     expect(find.text('待发货'), findsWidgets);
     expect(find.text('夏季轻运动鞋'), findsOneWidget);
+    expect(wechatGateway.lastRequest?.method, PaymentMethod.wechatPay);
+    expect(wechatGateway.lastRequest?.orderId, 'ORD-0000001');
+    expect(alipayGateway.lastRequest, isNull);
+  });
+
+  testWidgets('支付失败后会保留待付款订单并展示失败提示', (WidgetTester tester) async {
+    final _RecordingPaymentGateway alipayGateway = _RecordingPaymentGateway(
+      result: const PaymentResult(
+        method: PaymentMethod.alipay,
+        status: PaymentStatus.failure,
+        message: '支付宝支付失败',
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MainTabPage(
+          paymentService: PaymentService(
+            gateways: <PaymentMethod, PaymentGateway>{
+              PaymentMethod.alipay: alipayGateway,
+            },
+          ),
+        ),
+      ),
+    );
+
+    await _submitFirstOrder(tester);
+
+    expect(find.text('支付宝支付失败'), findsOneWidget);
+    expect(find.text('最近订单'), findsOneWidget);
+    expect(find.text('订单状态'), findsWidgets);
+    expect(find.text('待付款'), findsWidgets);
+    expect(alipayGateway.lastRequest?.method, PaymentMethod.alipay);
+    expect(alipayGateway.lastRequest?.orderId, 'ORD-0000001');
+  });
+
+  testWidgets('待付款订单可以继续支付并更新为待发货', (WidgetTester tester) async {
+    final _SequencedPaymentGateway alipayGateway = _SequencedPaymentGateway(
+      results: <PaymentResult>[
+        const PaymentResult(
+          method: PaymentMethod.alipay,
+          status: PaymentStatus.failure,
+          message: '支付宝支付失败',
+        ),
+      ],
+    );
+    final _SequencedPaymentGateway wechatGateway = _SequencedPaymentGateway(
+      results: <PaymentResult>[
+        const PaymentResult(
+          method: PaymentMethod.wechatPay,
+          status: PaymentStatus.success,
+          message: '微信补支付成功',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MainTabPage(
+          paymentService: PaymentService(
+            gateways: <PaymentMethod, PaymentGateway>{
+              PaymentMethod.alipay: alipayGateway,
+              PaymentMethod.wechatPay: wechatGateway,
+            },
+          ),
+        ),
+      ),
+    );
+
+    await _submitFirstOrder(tester);
+
+    expect(find.text('支付宝支付失败'), findsOneWidget);
+    expect(find.text('待付款'), findsWidgets);
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('profile-order-status-待付款')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('当前筛选：待付款'), findsOneWidget);
+    await tester.tap(
+      find.byKey(const ValueKey<String>('order-repay-ORD-0000001')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('订单确认'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey<String>('payment-method-wechat')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey<String>('order-confirm-pay')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('微信补支付成功'), findsOneWidget);
+    expect(find.text('当前还没有待付款的订单'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('待发货'), findsWidgets);
+    expect(alipayGateway.requests.single.orderId, 'ORD-0000001');
+    expect(wechatGateway.requests.single.orderId, 'ORD-0000001');
+    expect(wechatGateway.requests.single.method, PaymentMethod.wechatPay);
   });
 
   testWidgets('购物车提交订单前会先进入订单确认页并展示地址栏', (WidgetTester tester) async {

@@ -8,6 +8,7 @@ import 'package:my_first_app/app/config/app_config_loader.dart';
 import 'package:my_first_app/app/config/app_config_store.dart';
 import 'package:my_first_app/app/config/app_environment.dart';
 import 'package:my_first_app/bootstrap.dart';
+import 'package:my_first_app/features/payment/application/payment_sdk_initializer.dart';
 
 void main() {
   group('AppEnvironment', () {
@@ -88,6 +89,37 @@ void main() {
         'https://example.com/prod/link/',
       );
     });
+
+    testWidgets('启动前会预留支付 SDK 初始化入口', (WidgetTester tester) async {
+      AppConfigStore.resetForTest();
+      final _RecordingPaymentSdkInitializer initializer =
+          _RecordingPaymentSdkInitializer();
+
+      await bootstrap(
+        const SizedBox(key: ValueKey<String>('bootstrapped-app-with-payment')),
+        configLoader: AppConfigLoader(
+          bundle: FakeAssetBundle({
+            'assets/config/dev.json': jsonEncode(<String, Object>{
+              'appName': 'My First App Dev',
+              'apiBaseUrl': 'https://dev-api.example.com',
+              'enableDebugTools': true,
+              'enableRealPayment': false,
+              'alipayAppId': 'dev-alipay-app-id',
+              'wechatAppId': 'dev-wechat-app-id',
+              'wechatUniversalLink': 'https://example.com/dev/link/',
+            }),
+          }),
+          environmentValue: 'dev',
+        ),
+        paymentSdkInitializer: initializer,
+      );
+      await tester.pump();
+
+      expect(initializer.receivedConfig, isNotNull);
+      expect(initializer.receivedConfig?.environment, AppEnvironment.dev);
+      expect(initializer.receivedConfig?.wechatAppId, 'dev-wechat-app-id');
+      expect(find.byKey(const ValueKey<String>('bootstrapped-app-with-payment')), findsOneWidget);
+    });
   });
 }
 
@@ -106,5 +138,14 @@ class FakeAssetBundle extends CachingAssetBundle {
 
     final Uint8List bytes = Uint8List.fromList(utf8.encode(content));
     return ByteData.sublistView(bytes);
+  }
+}
+
+class _RecordingPaymentSdkInitializer implements PaymentSdkInitializer {
+  AppConfig? receivedConfig;
+
+  @override
+  Future<void> initialize(AppConfig config) async {
+    receivedConfig = config;
   }
 }

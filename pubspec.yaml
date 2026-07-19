@@ -25,6 +25,12 @@ dependencies:
   # 这个依赖提供 iOS 风格图标，通常配合 `CupertinoIcons` 使用。
   cupertino_icons: ^1.0.8
   video_player: ^2.11.1
+  # `tobias` 是 OpenFlutter 维护的支付宝 SDK 封装。
+  # 当前先用于预埋依赖和未来真实支付入口，学习阶段仍默认走 Mock 支付。
+  tobias: ^5.3.4
+  # `fluwx` 是微信开放能力封装，包含微信支付、分享、登录等。
+  # 当前阶段先接入依赖和初始化骨架，后续再切真实商户参数。
+  fluwx: ^6.0.0
 
 dev_dependencies:
   flutter_test:
@@ -48,6 +54,17 @@ flutter:
   # 不需要改 Android 或 iOS 的原生工程。
   assets:
     - assets/config/
+
+tobias:
+  # iOS 端支付宝回跳依赖 URL Scheme，这里先放学习阶段占位值。
+  url_scheme: myfirstappalipay
+
+fluwx:
+  # `pubspec.yaml` 里的值主要用于原生工程自动配置占位，
+  # 真正初始化微信 SDK 仍会在 Flutter 代码里显式调用 registerApi。
+  app_id: wx1234567890abcdef
+  universal_link: https://example.com/wechat/link/
+  scene_delegate: true
 
   # 图片资源可以配置多分辨率变体，具体可参考：
   # https://flutter.dev/to/resolution-aware-images

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:my_first_app/app/config/app_config_store.dart';
 import 'package:my_first_app/app/presentation/pages/main_tab_page.dart';
 import 'package:my_first_app/app/theme/app_theme.dart';
+import 'package:my_first_app/features/payment/application/payment_service_factory.dart';
 
 /// 整个应用的根组件。
 ///
@@ -25,7 +26,9 @@ class MyApp extends StatelessWidget {
       theme: AppTheme.light(),
       // 现在先把应用入口切到带底部导航的主页面，
       // 这样首页、分类、购物车、我的 4 个一级页面就有统一承载容器了。
-      home: const MainTabPage(),
+      home: MainTabPage(
+        paymentService: PaymentServiceFactory.create(appConfig),
+      ),
     );
   }
 }

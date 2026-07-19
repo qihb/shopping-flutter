@@ -17,6 +17,7 @@ class ProfilePage extends StatelessWidget {
   final ProfileSettings settings;
   final List<OrderRecord> orders;
   final ValueChanged<OrderRecord>? onAdvanceOrderStatus;
+  final Future<bool> Function(OrderRecord order)? onRepayOrder;
   final ValueChanged<UserAddress>? onSetDefaultAddress;
   final ValueChanged<bool>? onNotificationChanged;
   final ValueChanged<bool>? onBiometricUnlockChanged;
@@ -29,6 +30,7 @@ class ProfilePage extends StatelessWidget {
     required this.settings,
     this.orders = const <OrderRecord>[],
     this.onAdvanceOrderStatus,
+    this.onRepayOrder,
     this.onSetDefaultAddress,
     this.onNotificationChanged,
     this.onBiometricUnlockChanged,
@@ -48,6 +50,7 @@ class ProfilePage extends StatelessWidget {
           _OrderStatusOverview(
             orders: orders,
             onAdvanceOrderStatus: onAdvanceOrderStatus,
+            onRepayOrder: onRepayOrder,
           ),
           const SizedBox(height: 20),
           Text('最近订单', style: Theme.of(context).textTheme.headlineSmall),
@@ -126,10 +129,12 @@ class _ProfileHeaderCard extends StatelessWidget {
 class _OrderStatusOverview extends StatelessWidget {
   final List<OrderRecord> orders;
   final ValueChanged<OrderRecord>? onAdvanceOrderStatus;
+  final Future<bool> Function(OrderRecord order)? onRepayOrder;
 
   const _OrderStatusOverview({
     required this.orders,
     this.onAdvanceOrderStatus,
+    this.onRepayOrder,
   });
 
   void _openOrderRecordPage(BuildContext context, String statusLabel) {
@@ -141,6 +146,7 @@ class _OrderStatusOverview extends StatelessWidget {
           orders: orders,
           initialStatusLabel: statusLabel,
           onAdvanceOrderStatus: onAdvanceOrderStatus,
+          onRepayOrder: onRepayOrder,
         ),
       ),
     );
