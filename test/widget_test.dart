@@ -10,10 +10,37 @@ import 'package:my_first_app/app/app.dart';
 import 'package:my_first_app/app/config/app_config.dart';
 import 'package:my_first_app/app/config/app_config_store.dart';
 import 'package:my_first_app/app/config/app_environment.dart';
+import 'package:my_first_app/core/api/api_client.dart';
+import 'package:my_first_app/features/home/data/home_recommend_mock_service.dart';
+import 'package:my_first_app/features/home/data/home_recommend_service.dart';
 import 'package:my_first_app/features/home/presentation/models/home_banner_item.dart';
+import 'package:my_first_app/features/home/presentation/models/home_recommend_product.dart';
 import 'package:my_first_app/features/home/presentation/pages/home_banner_detail_page.dart';
 import 'package:my_first_app/features/home/presentation/widgets/home_banner_carousel.dart';
 import 'package:my_first_app/features/home/presentation/widgets/home_banner_video_player.dart';
+
+/// 测试用的推荐服务，封装原有的 mock 数据。
+class _TestRecommendService extends HomeRecommendService {
+  final HomeRecommendMockService _mockService;
+
+  _TestRecommendService({required super.apiClient})
+      : _mockService = const HomeRecommendMockService();
+
+  @override
+  Future<HomeRecommendPageResult> fetchRecommendProducts({
+    required int page,
+  }) async {
+    return _mockService.fetchRecommendProducts(page: page);
+  }
+}
+
+Widget _buildTestMyApp() {
+  return MyApp(
+    recommendService: _TestRecommendService(
+      apiClient: ApiClient(baseUrl: 'https://test.local'),
+    ),
+  );
+}
 
 void main() {
   setUp(() {
@@ -34,7 +61,7 @@ void main() {
   testWidgets('应用启动后显示 4 个底部导航菜单并默认停留在首页', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(_buildTestMyApp());
 
     expect(find.text('首页'), findsOneWidget);
     expect(find.text('分类'), findsOneWidget);
@@ -52,7 +79,7 @@ void main() {
   });
 
   testWidgets('点击底部导航后可以切换到对应一级页面', (WidgetTester tester) async {
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(_buildTestMyApp());
 
     await tester.tap(find.text('分类'));
     await tester.pumpAndSettle();

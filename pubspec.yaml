@@ -31,6 +31,13 @@ dependencies:
   # `fluwx` 是微信开放能力封装，包含微信支付、分享、登录等。
   # 当前阶段先接入依赖和初始化骨架，后续再切真实商户参数。
   fluwx: ^6.0.0
+  # `provider` 是 Flutter 官方推荐的状态管理方案之一。
+  # 它基于 `ChangeNotifier` + `InheritedWidget`，适合从 `setState` 逐步升级到轻量状态管理。
+  # 在这个项目里，我们会用它把购物车、订单、地址等跨页面状态从 MainTabPage 中拆出来。
+  provider: ^6.1.5
+  # `http` 是 Dart 官方提供的 HTTP 客户端包。
+  # 用于发起真实的网络请求，替换当前的 mock 数据服务。
+  http: ^1.6.0
 
 dev_dependencies:
   flutter_test:

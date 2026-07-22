@@ -143,7 +143,6 @@ class _OrderStatusOverview extends StatelessWidget {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (context) => OrderRecordPage(
-          orders: orders,
           initialStatusLabel: statusLabel,
           onAdvanceOrderStatus: onAdvanceOrderStatus,
           onRepayOrder: onRepayOrder,

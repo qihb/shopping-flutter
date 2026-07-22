@@ -1,70 +1,53 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import 'package:my_first_app/features/order/application/order_notifier.dart';
 import 'package:my_first_app/features/order/presentation/models/order_record.dart';
 import 'package:my_first_app/features/order/presentation/pages/order_detail_page.dart';
 
 /// 订单记录页。
 ///
-/// 这里单独拆一个页面，是为了让“我的”页里的订单状态入口
-/// 能像真实电商应用一样，通过点击跳到更完整的订单列表。
-class OrderRecordPage extends StatefulWidget {
-  final List<OrderRecord> orders;
+/// 现在通过 `context.watch<OrderNotifier>()` 实时监听订单列表，
+/// 不再依赖父组件传入静态的 `orders` props。
+/// 这样当订单状态发生变化时（支付成功、状态推进），页面会自动重建。
+class OrderRecordPage extends StatelessWidget {
   final String initialStatusLabel;
   final ValueChanged<OrderRecord>? onAdvanceOrderStatus;
   final Future<bool> Function(OrderRecord order)? onRepayOrder;
 
   const OrderRecordPage({
     super.key,
-    required this.orders,
     required this.initialStatusLabel,
     this.onAdvanceOrderStatus,
     this.onRepayOrder,
   });
 
   @override
-  State<OrderRecordPage> createState() => _OrderRecordPageState();
-}
-
-class _OrderRecordPageState extends State<OrderRecordPage> {
-  List<OrderRecord> _buildFilteredOrders() {
-    return widget.orders
-        .where((order) => order.statusLabel == widget.initialStatusLabel)
-        .toList(growable: false);
-  }
-
-  void _handleAdvanceOrderStatus(OrderRecord order) {
-    widget.onAdvanceOrderStatus?.call(order);
-    setState(() {});
-  }
-
-  Future<void> _handleRepayOrder(OrderRecord order) async {
-    final bool didSucceed = await widget.onRepayOrder?.call(order) ?? false;
-
-    if (didSucceed) {
-      setState(() {});
-    }
-  }
-
-  void _openOrderDetail(OrderRecord order) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (context) => OrderDetailPage(
-          order: order,
-          onAdvanceOrderStatus: widget.onAdvanceOrderStatus == null
-              ? null
-              : (targetOrder) {
-                  widget.onAdvanceOrderStatus?.call(targetOrder);
-                  setState(() {});
-                },
-          onRepayOrder: widget.onRepayOrder,
-        ),
-      ),
-    );
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final List<OrderRecord> filteredOrders = _buildFilteredOrders();
+    final OrderNotifier orderNotifier = context.watch<OrderNotifier>();
+
+    final List<OrderRecord> filteredOrders = orderNotifier.orders
+        .where((order) => order.statusLabel == initialStatusLabel)
+        .toList(growable: false);
+
+    void handleAdvanceStatus(OrderRecord order) =>
+        onAdvanceOrderStatus?.call(order);
+
+    Future<void> handleRepayOrder(OrderRecord order) async =>
+        await onRepayOrder?.call(order);
+
+    void openOrderDetail(OrderRecord order) {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (context) => OrderDetailPage(
+            order: order,
+            onAdvanceOrderStatus:
+                onAdvanceOrderStatus == null ? null : (order) => handleAdvanceStatus(order),
+            onRepayOrder: onRepayOrder,
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(title: const Text('订单记录')),
@@ -78,7 +61,7 @@ class _OrderRecordPageState extends State<OrderRecordPage> {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
-              '当前筛选：${widget.initialStatusLabel}',
+              '当前筛选：$initialStatusLabel',
               style: Theme.of(
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
@@ -86,20 +69,20 @@ class _OrderRecordPageState extends State<OrderRecordPage> {
           ),
           const SizedBox(height: 16),
           if (filteredOrders.isEmpty)
-            _OrderRecordEmptyState(statusLabel: widget.initialStatusLabel)
+            _OrderRecordEmptyState(statusLabel: initialStatusLabel)
           else
             ...filteredOrders.map(
               (order) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: _OrderRecordCard(
                   order: order,
-                  onTap: () => _openOrderDetail(order),
-                  onAdvanceOrderStatus: widget.onAdvanceOrderStatus == null
+                  onTap: () => openOrderDetail(order),
+                  onAdvanceOrderStatus: onAdvanceOrderStatus == null
                       ? null
-                      : () => _handleAdvanceOrderStatus(order),
-                  onRepayOrder: widget.onRepayOrder == null
+                      : () => handleAdvanceStatus(order),
+                  onRepayOrder: onRepayOrder == null
                       ? null
-                      : () => _handleRepayOrder(order),
+                      : () => handleRepayOrder(order),
                 ),
               ),
             ),

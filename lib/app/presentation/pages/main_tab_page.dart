@@ -1,86 +1,63 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import 'package:my_first_app/features/cart/presentation/models/cart_item.dart';
+import 'package:my_first_app/features/cart/application/cart_notifier.dart';
 import 'package:my_first_app/features/cart/presentation/pages/cart_page.dart';
 import 'package:my_first_app/features/category/presentation/pages/category_page.dart';
+import 'package:my_first_app/features/home/data/home_recommend_service.dart';
 import 'package:my_first_app/features/home/presentation/models/home_recommend_product.dart';
 import 'package:my_first_app/features/home/presentation/pages/home_page.dart';
+import 'package:my_first_app/features/order/application/order_notifier.dart';
 import 'package:my_first_app/features/order/presentation/models/order_record.dart';
 import 'package:my_first_app/features/order/presentation/pages/order_confirm_page.dart';
-import 'package:my_first_app/features/payment/application/payment_service.dart';
-import 'package:my_first_app/features/payment/application/payment_service_factory.dart';
-import 'package:my_first_app/features/payment/data/models/payment_request.dart';
 import 'package:my_first_app/features/payment/presentation/models/payment_method.dart';
 import 'package:my_first_app/features/payment/presentation/models/payment_result.dart';
+import 'package:my_first_app/features/profile/application/address_notifier.dart';
+import 'package:my_first_app/features/profile/application/settings_notifier.dart';
 import 'package:my_first_app/features/profile/presentation/models/user_address.dart';
-import 'package:my_first_app/features/profile/presentation/models/profile_settings.dart';
 import 'package:my_first_app/features/profile/presentation/models/user_profile_summary.dart';
 import 'package:my_first_app/features/profile/presentation/pages/profile_page.dart';
 
 /// 带底部导航的主页面。
 ///
-/// 这里使用 `StatefulWidget`，是因为当前选中的菜单索引会变化。
-/// 你可以先把它理解成“页面里有一小块会随点击变化的本地状态”。
+/// 现在页面本身只保留纯粹的 UI 导航状态（当前 Tab、分类定位），
+/// 购物车、订单、地址、设置等跨页面状态全部拆到各自的 `ChangeNotifier` 中，
+/// 通过 `provider` 包注入到子树。
 class MainTabPage extends StatefulWidget {
-  final PaymentService? paymentService;
+  /// 可选注入的推荐服务，主要用于测试。
+  final HomeRecommendService? recommendService;
 
-  const MainTabPage({
-    super.key,
-    this.paymentService,
-  });
+  const MainTabPage({super.key, this.recommendService});
 
   @override
   State<MainTabPage> createState() => _MainTabPageState();
 }
 
 class _MainTabPageState extends State<MainTabPage> {
-  static const UserProfileSummary _baseProfile = UserProfileSummary(
-    displayName: 'Qi Hai Bing',
-    email: 'qihaibing@example.com',
-    memberLabel: '成长会员',
-    defaultAddress: '上海市浦东新区张江高科',
-  );
-
   int _currentIndex = 0;
   String? _selectedCategoryLabel;
-  final List<CartItem> _cartItems = <CartItem>[];
-  final List<OrderRecord> _orders = <OrderRecord>[];
-  List<UserAddress> _addresses = const <UserAddress>[
-    UserAddress(
-      recipientName: 'Qi Hai Bing',
-      phone: '138 0000 1234',
-      cityLabel: '上海市',
-      detailAddress: '浦东新区张江高科',
-      isDefault: true,
-    ),
-    UserAddress(
-      recipientName: 'Qi Hai Bing',
-      phone: '138 0000 5678',
-      cityLabel: '上海市',
-      detailAddress: '徐汇区漕河泾开发区',
-    ),
-  ];
-  ProfileSettings _settings = const ProfileSettings(
-    enableNotification: true,
-    enableBiometricUnlock: false,
-    enablePriceAlert: true,
-  );
-  late final PaymentService _paymentService =
-      widget.paymentService ?? PaymentServiceFactory.createMock();
 
-  UserAddress get _defaultAddress {
-    return _addresses.firstWhere((address) => address.isDefault);
+  // ---------- 辅助 getter ----------
+
+  /// 个人信息摘要，依赖地址 Notifier 计算默认地址。
+  UserProfileSummary _profile({
+    required AddressNotifier addressNotifier,
+  }) {
+    const UserProfileSummary baseProfile = UserProfileSummary(
+      displayName: 'Qi Hai Bing',
+      email: 'qihaibing@example.com',
+      memberLabel: '成长会员',
+      defaultAddress: '上海市浦东新区张江高科',
+    );
+
+    return baseProfile.copyWith(
+      defaultAddress: addressNotifier.defaultAddress.fullAddress,
+    );
   }
 
-  UserProfileSummary get _profile {
-    return _baseProfile.copyWith(defaultAddress: _defaultAddress.fullAddress);
-  }
+  // ---------- 导航与 SnackBar ----------
 
-  int get _cartItemCount {
-    return _cartItems.fold<int>(0, (sum, item) => sum + item.quantity);
-  }
-
-  void _showMessage(String message) {
+  void _showMessage(BuildContext context, String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
@@ -91,6 +68,12 @@ class _MainTabPageState extends State<MainTabPage> {
       );
   }
 
+  void _switchTab(int index) {
+    setState(() {
+      _currentIndex = index;
+    });
+  }
+
   void _openCategoryFromHome(String categoryLabel) {
     setState(() {
       _selectedCategoryLabel = categoryLabel;
@@ -98,302 +81,211 @@ class _MainTabPageState extends State<MainTabPage> {
     });
   }
 
-  void _addProductToCart(HomeRecommendProduct product) {
-    final int existingIndex = _cartItems.indexWhere(
-      (item) => item.name == product.name,
-    );
+  // ---------- 加购 ----------
 
+  void _addProductToCart(BuildContext context, HomeRecommendProduct product) {
+    context.read<CartNotifier>().addProduct(product);
     setState(() {
-      if (existingIndex >= 0) {
-        final CartItem existingItem = _cartItems[existingIndex];
-        _cartItems[existingIndex] = existingItem.copyWith(
-          quantity: existingItem.quantity + 1,
-        );
-      } else {
-        _cartItems.add(CartItem.fromHomeRecommendProduct(product));
-      }
-
       _currentIndex = 2;
     });
-
-    _showMessage('已加入购物车：${product.name}');
+    _showMessage(context, '已加入购物车：${product.name}');
   }
 
-  void _increaseCartItemQuantity(CartItem item) {
-    final int itemIndex = _cartItems.indexWhere(
-      (cartItem) => cartItem.name == item.name,
-    );
+  // ---------- 提交订单 ----------
 
-    if (itemIndex < 0) {
-      return;
-    }
+  void _openOrderConfirmPage(BuildContext context) {
+    final CartNotifier cartNotifier = context.read<CartNotifier>();
 
-    setState(() {
-      final CartItem existingItem = _cartItems[itemIndex];
-      _cartItems[itemIndex] = existingItem.copyWith(
-        quantity: existingItem.quantity + 1,
-      );
-    });
-  }
-
-  void _decreaseCartItemQuantity(CartItem item) {
-    final int itemIndex = _cartItems.indexWhere(
-      (cartItem) => cartItem.name == item.name,
-    );
-
-    if (itemIndex < 0) {
-      return;
-    }
-
-    setState(() {
-      final CartItem existingItem = _cartItems[itemIndex];
-      final int nextQuantity = existingItem.quantity - 1;
-
-      _cartItems[itemIndex] = existingItem.copyWith(
-        quantity: nextQuantity < 1 ? 1 : nextQuantity,
-      );
-    });
-  }
-
-  void _removeCartItem(CartItem item) {
-    setState(() {
-      _cartItems.removeWhere((cartItem) => cartItem.name == item.name);
-    });
-
-    _showMessage('已从购物车删除：${item.name}');
-  }
-
-  void _clearCart() {
-    if (_cartItems.isEmpty) {
-      return;
-    }
-
-    setState(() {
-      _cartItems.clear();
-    });
-
-    _showMessage('购物车已清空');
-  }
-
-  void _openOrderConfirmPage() {
-    if (_cartItems.isEmpty) {
+    if (cartNotifier.isEmpty) {
       return;
     }
 
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (context) => OrderConfirmPage(
-          items: _cartItems,
-          address: _defaultAddress,
+          items: cartNotifier.items,
+          address: context.read<AddressNotifier>().defaultAddress,
           onConfirmPayment: (method) async {
-            await _submitOrder(method);
-            if (!mounted) {
+            final bool didSucceed = await _submitOrder(context, method);
+            if (!context.mounted) {
               return;
             }
-            Navigator.of(this.context).pop();
+            Navigator.of(context).pop();
+            if (didSucceed) {
+              _switchTab(3);
+            }
           },
         ),
       ),
     );
   }
 
-  Future<bool> _openRepayOrderConfirmPage(OrderRecord order) async {
+  Future<bool> _submitOrder(
+    BuildContext context,
+    PaymentMethod method,
+  ) async {
+    final CartNotifier cartNotifier = context.read<CartNotifier>();
+    final OrderNotifier orderNotifier = context.read<OrderNotifier>();
+    final AddressNotifier addressNotifier = context.read<AddressNotifier>();
+
+    if (cartNotifier.isEmpty) {
+      return false;
+    }
+
+    final PaymentResult result = await orderNotifier.submitOrder(
+      cartItems: cartNotifier.items,
+      shippingAddress: addressNotifier.defaultAddress,
+      method: method,
+    );
+
+    if (result.status == PaymentStatus.success) {
+      cartNotifier.clear();
+    }
+
+    _showMessage(context, result.message);
+    return result.status == PaymentStatus.success;
+  }
+
+  // ---------- 重新支付 ----------
+
+  Future<bool> _openRepayOrderConfirmPage(
+    BuildContext context, {
+    required OrderRecord order,
+  }) async {
     final bool? didSucceed = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
         builder: (context) => OrderConfirmPage(
           items: order.items,
           address: order.shippingAddress,
           onConfirmPayment: (method) async {
-            final bool didSucceed = await _repayOrder(order, method);
-            if (!mounted) {
+            final bool ok = await _repayOrder(context, order: order, method: method);
+            if (!context.mounted) {
               return;
             }
-            Navigator.of(this.context).pop(didSucceed);
+            Navigator.of(context).pop(ok);
           },
         ),
       ),
     );
 
+    if (didSucceed == true) {
+      _switchTab(3);
+    }
+
     return didSucceed ?? false;
   }
 
-  Future<void> _submitOrder(PaymentMethod method) async {
-    if (_cartItems.isEmpty) {
-      return;
-    }
-
-    final String orderId = 'ORD-${(_orders.length + 1).toString().padLeft(7, '0')}';
-    final OrderRecord draftOrder = OrderRecord.fromCartItems(
-      id: 'ORD-${(_orders.length + 1).toString().padLeft(7, '0')}',
-      items: _cartItems,
-      shippingAddress: _defaultAddress,
-    );
-    final PaymentResult paymentResult = await _paymentService.pay(
-      PaymentRequest(
-        orderId: orderId,
-        amount: draftOrder.totalPrice,
-        title: draftOrder.items.first.name,
-        method: method,
-      ),
-    );
-    final OrderRecord order = paymentResult.status == PaymentStatus.success
-        ? draftOrder.advanceStatus()
-        : draftOrder;
-
-    setState(() {
-      _orders.insert(0, order);
-      _cartItems.clear();
-      _currentIndex = 3;
-    });
-
-    _showMessage(paymentResult.message);
+  Future<bool> _repayOrder(
+    BuildContext context, {
+    required OrderRecord order,
+    required PaymentMethod method,
+  }) async {
+    final OrderNotifier orderNotifier = context.read<OrderNotifier>();
+    final bool didSucceed = await orderNotifier.repayOrder(order, method);
+    return didSucceed;
   }
 
-  Future<bool> _repayOrder(OrderRecord order, PaymentMethod method) async {
-    final int orderIndex = _orders.indexWhere((item) => item.id == order.id);
+  // ---------- 推进订单状态 ----------
 
-    if (orderIndex < 0) {
-      return false;
-    }
-
-    final PaymentResult paymentResult = await _paymentService.pay(
-      PaymentRequest(
-        orderId: order.id,
-        amount: order.totalPrice,
-        title: order.items.first.name,
-        method: method,
-      ),
-    );
-
-    setState(() {
-      if (paymentResult.status == PaymentStatus.success) {
-        _orders[orderIndex] = _orders[orderIndex].advanceStatus();
-      }
-
-      _currentIndex = 3;
-    });
-
-    _showMessage(paymentResult.message);
-    return paymentResult.status == PaymentStatus.success;
+  void _advanceOrderStatus(BuildContext context, OrderRecord order) {
+    final OrderNotifier orderNotifier = context.read<OrderNotifier>();
+    orderNotifier.advanceStatus(order);
+    _showMessage(context, '订单状态已更新为：${order.nextStatusLabel}');
   }
 
-  void _advanceOrderStatus(OrderRecord order) {
-    final int orderIndex = _orders.indexWhere((item) => item.id == order.id);
+  // ---------- 设置 ----------
 
-    if (orderIndex < 0) {
-      return;
-    }
-
-    final OrderRecord nextOrder = _orders[orderIndex].advanceStatus();
-
-    if (identical(nextOrder, _orders[orderIndex])) {
-      return;
-    }
-
-    setState(() {
-      _orders[orderIndex] = nextOrder;
-    });
-
-    _showMessage('订单状态已更新为：${nextOrder.statusLabel}');
+  void _updateNotificationSetting(BuildContext context, bool value) {
+    context.read<SettingsNotifier>().updateNotification(value);
   }
 
-  void _updateNotificationSetting(bool value) {
-    setState(() {
-      _settings = _settings.copyWith(enableNotification: value);
-    });
+  void _updateBiometricSetting(BuildContext context, bool value) {
+    context.read<SettingsNotifier>().updateBiometric(value);
   }
 
-  void _updateBiometricSetting(bool value) {
-    setState(() {
-      _settings = _settings.copyWith(enableBiometricUnlock: value);
-    });
+  void _updatePriceAlertSetting(BuildContext context, bool value) {
+    context.read<SettingsNotifier>().updatePriceAlert(value);
   }
 
-  void _updatePriceAlertSetting(bool value) {
-    setState(() {
-      _settings = _settings.copyWith(enablePriceAlert: value);
-    });
+  // ---------- 默认地址 ----------
+
+  void _setDefaultAddress(BuildContext context, UserAddress address) {
+    context.read<AddressNotifier>().setDefault(address);
+    _showMessage(context, '默认地址已更新');
   }
 
-  void _setDefaultAddress(UserAddress targetAddress) {
-    setState(() {
-      _addresses = _addresses
-          .map(
-            (address) => address.copyWith(
-              isDefault: address.fullAddress == targetAddress.fullAddress,
-            ),
-          )
-          .toList(growable: false);
-    });
-
-    _showMessage('默认地址已更新');
-  }
+  // ---------- build ----------
 
   @override
   Widget build(BuildContext context) {
-    final List<OrderRecord> displayOrders = _orders.isEmpty
-        ? OrderRecord.learningSamples
-        : _orders;
-    // 4 个一级页面还是通过 `IndexedStack` 统一承载，
-    // 只是首页和分类页现在需要和外层交换一点点状态。
+    final CartNotifier cartNotifier = context.watch<CartNotifier>();
+
     final List<Widget> pages = [
       HomePage(
         onCategoryTap: _openCategoryFromHome,
-        onAddToCart: _addProductToCart,
+        onAddToCart: (product) => _addProductToCart(context, product),
+        recommendService: widget.recommendService,
       ),
       CategoryPage(
         initialCategoryLabel: _selectedCategoryLabel,
-        onAddToCart: _addProductToCart,
+        onAddToCart: (product) => _addProductToCart(context, product),
       ),
+      // 购物车页现在直接从 CartNotifier 读取数据，
+      // 但仍然预留回调出口，由 MainTabPage 编排跨 Notifier 的操作。
       CartPage(
-        items: _cartItems,
-        onIncreaseQuantity: _increaseCartItemQuantity,
-        onDecreaseQuantity: _decreaseCartItemQuantity,
-        onRemoveItem: _removeCartItem,
-        onClearCart: _clearCart,
-        onSubmitOrder: _openOrderConfirmPage,
+        onOpenConfirmPage: () => _openOrderConfirmPage(context),
       ),
-      ProfilePage(
-        profile: _profile,
-        addresses: _addresses,
-        settings: _settings,
-        orders: displayOrders,
-        onAdvanceOrderStatus: _orders.isEmpty ? null : _advanceOrderStatus,
-        onRepayOrder: _orders.isEmpty ? null : _openRepayOrderConfirmPage,
-        onSetDefaultAddress: _setDefaultAddress,
-        onNotificationChanged: _updateNotificationSetting,
-        onBiometricUnlockChanged: _updateBiometricSetting,
-        onPriceAlertChanged: _updatePriceAlertSetting,
+      Builder(
+        builder: (ctx) {
+          final AddressNotifier addressNotifier = ctx.watch<AddressNotifier>();
+          final SettingsNotifier settingsNotifier = ctx.watch<SettingsNotifier>();
+          final OrderNotifier orderNotifier = ctx.watch<OrderNotifier>();
+
+          return ProfilePage(
+            profile: _profile(addressNotifier: addressNotifier),
+            addresses: addressNotifier.addresses,
+            settings: settingsNotifier.settings,
+            orders: orderNotifier.displayOrders,
+            onAdvanceOrderStatus: orderNotifier.orders.isEmpty
+                ? null
+                : (order) => _advanceOrderStatus(context, order),
+            onRepayOrder: orderNotifier.orders.isEmpty
+                ? null
+                : (order) => _openRepayOrderConfirmPage(context, order: order),
+            onSetDefaultAddress: (address) =>
+                _setDefaultAddress(context, address),
+            onNotificationChanged: (value) =>
+                _updateNotificationSetting(context, value),
+            onBiometricUnlockChanged: (value) =>
+                _updateBiometricSetting(context, value),
+            onPriceAlertChanged: (value) =>
+                _updatePriceAlertSetting(context, value),
+          );
+        },
       ),
     ];
 
     return Scaffold(
-      // `IndexedStack` 很适合做 Tab 场景。
-      // 它会像网页里“切换页签但保留内容”那样，只显示当前索引对应的页面。
       body: IndexedStack(index: _currentIndex, children: pages),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         type: BottomNavigationBarType.fixed,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
+        onTap: _switchTab,
         items: [
           const BottomNavigationBarItem(
             icon: Icon(Icons.home_outlined),
             label: '首页',
           ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.grid_view_outlined),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.grid_view_outlined),
             label: '分类',
           ),
           BottomNavigationBarItem(
-            icon: _CartTabIcon(itemCount: _cartItemCount),
+            icon: _CartTabIcon(itemCount: cartNotifier.itemCount),
             label: '购物车',
           ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.person_outline),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
             label: '我的',
           ),
         ],

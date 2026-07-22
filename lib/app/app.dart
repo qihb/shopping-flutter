@@ -1,33 +1,72 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import 'package:my_first_app/app/config/app_config_store.dart';
 import 'package:my_first_app/app/presentation/pages/main_tab_page.dart';
 import 'package:my_first_app/app/theme/app_theme.dart';
+import 'package:my_first_app/features/cart/application/cart_notifier.dart';
+import 'package:my_first_app/features/home/data/home_recommend_service.dart';
+import 'package:my_first_app/features/order/application/order_notifier.dart';
 import 'package:my_first_app/features/payment/application/payment_service_factory.dart';
+import 'package:my_first_app/features/profile/application/address_notifier.dart';
+import 'package:my_first_app/features/profile/application/settings_notifier.dart';
+import 'package:my_first_app/features/profile/presentation/models/user_address.dart';
 
 /// 整个应用的根组件。
 ///
-/// 这个文件可以理解成“应用外壳”：
-/// - 决定应用使用什么主题
-/// - 决定首页先打开哪个页面
-/// - 后面也可以在这里接入路由、国际化、全局导航等能力
+/// `MultiProvider` 是 `provider` 包提供的多状态容器：
+/// - 它把多个 `ChangeNotifier` 注册到 Widget 树顶部
+/// - 子树中任何位置都可以通过 `context.watch<T>()` / `context.read<T>()` 访问
+///
+/// 以前这些状态全部挤在 `MainTabPage` 的 State 里，
+/// 现在这些状态各自拆成独立的 Notifier，职责更清晰。
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  /// 可选注入的推荐服务，主要用于测试。
+  final HomeRecommendService? recommendService;
+
+  const MyApp({super.key, this.recommendService});
 
   @override
   Widget build(BuildContext context) {
     final appConfig = AppConfigStore.instance;
 
-    return MaterialApp(
-      // 应用名称来自环境配置。
-      // 这样一来，开发、预发、生产环境都可以显示不同标题，便于肉眼区分当前包的来源。
-      title: appConfig.appName,
-      // 全局主题配置统一从 theme 文件读取，避免页面里到处写样式。
-      theme: AppTheme.light(),
-      // 现在先把应用入口切到带底部导航的主页面，
-      // 这样首页、分类、购物车、我的 4 个一级页面就有统一承载容器了。
-      home: MainTabPage(
-        paymentService: PaymentServiceFactory.create(appConfig),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<CartNotifier>(
+          create: (_) => CartNotifier(),
+        ),
+        ChangeNotifierProvider<OrderNotifier>(
+          create: (_) => OrderNotifier(
+            paymentService: PaymentServiceFactory.create(appConfig),
+          ),
+        ),
+        ChangeNotifierProvider<AddressNotifier>(
+          create: (_) => AddressNotifier(
+            initialAddresses: const <UserAddress>[
+              UserAddress(
+                recipientName: 'Qi Hai Bing',
+                phone: '138 0000 1234',
+                cityLabel: '上海市',
+                detailAddress: '浦东新区张江高科',
+                isDefault: true,
+              ),
+              UserAddress(
+                recipientName: 'Qi Hai Bing',
+                phone: '138 0000 5678',
+                cityLabel: '上海市',
+                detailAddress: '徐汇区漕河泾开发区',
+              ),
+            ],
+          ),
+        ),
+        ChangeNotifierProvider<SettingsNotifier>(
+          create: (_) => SettingsNotifier(),
+        ),
+      ],
+      child: MaterialApp(
+        title: appConfig.appName,
+        theme: AppTheme.light(),
+        home: MainTabPage(recommendService: recommendService),
       ),
     );
   }

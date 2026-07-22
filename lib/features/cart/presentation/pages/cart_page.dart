@@ -1,32 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import 'package:my_first_app/features/cart/application/cart_notifier.dart';
 import 'package:my_first_app/features/cart/presentation/models/cart_item.dart';
 
 /// 购物车页。
 ///
-/// 当前先实现“空购物车”和“基础商品列表”两种状态，
-/// 这样商品详情页的“加入购物车”就有明确承接位置了。
+/// 现在直接从 `CartNotifier` 读取和操作数据，
+/// 不再依赖父组件通过 props 传入。
+/// 提交订单仍然通过 `onOpenConfirmPage` 回调交由 `MainTabPage` 编排。
 class CartPage extends StatelessWidget {
-  final List<CartItem> items;
-  final ValueChanged<CartItem>? onIncreaseQuantity;
-  final ValueChanged<CartItem>? onDecreaseQuantity;
-  final ValueChanged<CartItem>? onRemoveItem;
-  final VoidCallback? onClearCart;
-  final VoidCallback? onSubmitOrder;
+  final VoidCallback? onOpenConfirmPage;
 
-  const CartPage({
-    super.key,
-    this.items = const <CartItem>[],
-    this.onIncreaseQuantity,
-    this.onDecreaseQuantity,
-    this.onRemoveItem,
-    this.onClearCart,
-    this.onSubmitOrder,
-  });
+  const CartPage({super.key, this.onOpenConfirmPage});
 
   @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) {
+    final CartNotifier cartNotifier = context.watch<CartNotifier>();
+
+    if (cartNotifier.isEmpty) {
       return SafeArea(
         child: Center(
           child: Column(
@@ -44,11 +36,6 @@ class CartPage extends StatelessWidget {
       );
     }
 
-    final int totalPrice = items.fold<int>(
-      0,
-      (sum, item) => sum + item.totalPrice,
-    );
-
     return SafeArea(
       child: Column(
         children: [
@@ -58,7 +45,7 @@ class CartPage extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    '购物车商品 ${items.length} 件',
+                    '购物车商品 ${cartNotifier.items.length} 件',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
@@ -66,7 +53,7 @@ class CartPage extends StatelessWidget {
                 ),
                 TextButton(
                   key: const ValueKey<String>('cart-clear-all'),
-                  onPressed: onClearCart,
+                  onPressed: () => cartNotifier.clear(),
                   child: const Text('清空购物车'),
                 ),
               ],
@@ -76,17 +63,17 @@ class CartPage extends StatelessWidget {
             child: ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               itemBuilder: (context, index) {
-                final CartItem item = items[index];
+                final CartItem item = cartNotifier.items[index];
 
                 return _CartItemCard(
                   item: item,
-                  onIncreaseQuantity: onIncreaseQuantity,
-                  onDecreaseQuantity: onDecreaseQuantity,
-                  onRemoveItem: onRemoveItem,
+                  onIncrease: () => cartNotifier.increaseQuantity(item),
+                  onDecrease: () => cartNotifier.decreaseQuantity(item),
+                  onRemove: () => cartNotifier.removeItem(item),
                 );
               },
               separatorBuilder: (_, _) => const SizedBox(height: 12),
-              itemCount: items.length,
+              itemCount: cartNotifier.items.length,
             ),
           ),
           Container(
@@ -103,7 +90,7 @@ class CartPage extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    '合计 EUR $totalPrice',
+                    '合计 EUR ${cartNotifier.totalPrice}',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
@@ -111,7 +98,7 @@ class CartPage extends StatelessWidget {
                 ),
                 FilledButton(
                   key: const ValueKey<String>('cart-submit-order'),
-                  onPressed: onSubmitOrder,
+                  onPressed: onOpenConfirmPage,
                   child: const Text('提交订单'),
                 ),
               ],
@@ -125,15 +112,15 @@ class CartPage extends StatelessWidget {
 
 class _CartItemCard extends StatelessWidget {
   final CartItem item;
-  final ValueChanged<CartItem>? onIncreaseQuantity;
-  final ValueChanged<CartItem>? onDecreaseQuantity;
-  final ValueChanged<CartItem>? onRemoveItem;
+  final VoidCallback onIncrease;
+  final VoidCallback onDecrease;
+  final VoidCallback onRemove;
 
   const _CartItemCard({
     required this.item,
-    this.onIncreaseQuantity,
-    this.onDecreaseQuantity,
-    this.onRemoveItem,
+    required this.onIncrease,
+    required this.onDecrease,
+    required this.onRemove,
   });
 
   @override
@@ -197,7 +184,7 @@ class _CartItemCard extends StatelessWidget {
                   children: [
                     IconButton(
                       key: ValueKey<String>('cart-decrease-${item.name}'),
-                      onPressed: () => onDecreaseQuantity?.call(item),
+                      onPressed: onDecrease,
                       icon: const Icon(Icons.remove_circle_outline),
                     ),
                     Text(
@@ -206,13 +193,13 @@ class _CartItemCard extends StatelessWidget {
                     ),
                     IconButton(
                       key: ValueKey<String>('cart-increase-${item.name}'),
-                      onPressed: () => onIncreaseQuantity?.call(item),
+                      onPressed: onIncrease,
                       icon: const Icon(Icons.add_circle_outline),
                     ),
                     const Spacer(),
                     TextButton.icon(
                       key: ValueKey<String>('cart-delete-${item.name}'),
-                      onPressed: () => onRemoveItem?.call(item),
+                      onPressed: onRemove,
                       icon: const Icon(Icons.delete_outline),
                       label: const Text('删除'),
                     ),
