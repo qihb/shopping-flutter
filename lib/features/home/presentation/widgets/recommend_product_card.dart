@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 /// 首页推荐商品卡片。
 ///
-/// `Card` 可以理解成 Material 风格里很常见的一种“信息承载容器”。
-/// 电商首页里的商品推荐、订单摘要、地址信息等内容，经常都可以放进卡片里展示。
+/// 使用 Material `Card` 承载商品信息，电商首页的商品推荐、
+/// 订单摘要、地址信息等都可以用卡片统一呈现。
 class RecommendProductCard extends StatelessWidget {
   final String name;
   final String description;

@@ -3,12 +3,12 @@ import 'package:my_first_app/bootstrap.dart';
 
 /// 应用启动入口。
 ///
-/// 你可以把它理解成整个 Flutter 项目的“总开关”：
-/// 1. 先进入 `main()` 方法。
-/// 2. 再调用 `bootstrap()` 做启动前准备。
-/// 3. 最后把 `MyApp` 挂载到屏幕上。
+/// 启动流程分三步：
+/// 1. 进入 `main()` 方法。
+/// 2. 调用 `bootstrap()` 完成启动前准备。
+/// 3. 将 `MyApp` 挂载到屏幕上。
 ///
-/// 后续如果你要加环境初始化、日志、异常上报，通常也是从这里开始。
+/// 环境初始化、日志、异常上报等启动逻辑也统一从这里接入。
 Future<void> main() async {
   await bootstrap(const MyApp());
 }

@@ -1,98 +1,60 @@
 name: my_first_app
-description: "一个用于学习 Flutter 的电商网站项目。"
-# 下面这一行可以防止项目被误发布到 pub.dev。
-# 对于私有项目或学习项目，通常建议保留该配置。
-publish_to: 'none' # 如果未来要发布到 pub.dev，再移除这一行。
+description: "一个基于 Flutter 的电商应用。"
+# 防止项目被误发布到 pub.dev。
+publish_to: 'none' # 如需发布到 pub.dev，移除这一行。
 
-# 下面定义应用版本号和构建号。
-# 版本号通常形如 1.2.43，构建号则写在 `+` 后面。
-# 在执行 flutter build 时，也可以通过命令参数覆盖这两个值。
-# Android 中，build-name 对应 versionName，build-number 对应 versionCode。
-# iOS 中，build-name 对应 CFBundleShortVersionString，build-number 对应 CFBundleVersion。
-# Windows 中，build-name 会映射为产品版本号的主次补丁位，build-number 会作为构建后缀。
+# 应用版本号与构建号。
+# 版本号通常形如 1.2.43，构建号写在 `+` 后面。
+# 执行 flutter build 时，可通过命令参数覆盖这两个值。
+# Android 中 build-name 对应 versionName，build-number 对应 versionCode。
+# iOS 中 build-name 对应 CFBundleShortVersionString，build-number 对应 CFBundleVersion。
 version: 1.0.0+1
 
 environment:
   sdk: ^3.12.0
 
-# dependencies 用来声明项目运行所需的依赖包。
-# 如果你想批量升级依赖，可以执行 `flutter pub upgrade --major-versions`。
-# 如果想查看哪些依赖有新版本，可以执行 `flutter pub outdated`。
 dependencies:
   flutter:
     sdk: flutter
 
-  # 这个依赖提供 iOS 风格图标，通常配合 `CupertinoIcons` 使用。
+  # iOS 风格图标，配合 `CupertinoIcons` 使用。
   cupertino_icons: ^1.0.8
   video_player: ^2.11.1
-  # `tobias` 是 OpenFlutter 维护的支付宝 SDK 封装。
-  # 当前先用于预埋依赖和未来真实支付入口，学习阶段仍默认走 Mock 支付。
+  # `tobias` 是支付宝 SDK 的 Flutter 封装，用于接入支付宝支付。
   tobias: ^5.3.4
-  # `fluwx` 是微信开放能力封装，包含微信支付、分享、登录等。
-  # 当前阶段先接入依赖和初始化骨架，后续再切真实商户参数。
+  # `fluwx` 是微信开放能力封装，包含微信支付、分享、登录等能力。
   fluwx: ^6.0.0
-  # `provider` 是 Flutter 官方推荐的状态管理方案之一。
-  # 它基于 `ChangeNotifier` + `InheritedWidget`，适合从 `setState` 逐步升级到轻量状态管理。
-  # 在这个项目里，我们会用它把购物车、订单、地址等跨页面状态从 MainTabPage 中拆出来。
+  # `provider` 基于 `ChangeNotifier` + `InheritedWidget` 的轻量状态管理，
+  # 用于承载购物车、订单、地址等跨页面共享状态。
   provider: ^6.1.5
-  # `http` 是 Dart 官方提供的 HTTP 客户端包。
-  # 用于发起真实的网络请求，替换当前的 mock 数据服务。
+  # `http` 是 Dart 官方提供的 HTTP 客户端，用于发起网络请求。
   http: ^1.6.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  # `flutter_lints` 提供 Flutter 官方推荐的一组静态检查规则。
-  # 这些规则会在根目录的 `analysis_options.yaml` 中启用。
+  # `flutter_lints` 提供 Flutter 官方推荐的静态检查规则，
+  # 在根目录的 `analysis_options.yaml` 中启用。
   flutter_lints: ^6.0.0
 
-# 关于 pubspec 的更多说明，可以查看：
-# https://dart.dev/tools/pub/pubspec
-
-# 下面这部分是 Flutter 项目专属配置。
 flutter:
 
-  # 启用 Material Icons，这样项目里就可以直接使用 Material 图标。
+  # 启用 Material Icons，项目里可直接使用 Material 图标。
   uses-material-design: true
 
-  # 把环境配置 JSON 注册成 Flutter 资源。
-  # 这样我们就可以在纯 Dart 层通过 `rootBundle` 读取它们，
-  # 不需要改 Android 或 iOS 的原生工程。
+  # 将环境配置 JSON 注册为 Flutter 资源，
+  # 便于在纯 Dart 层通过 `rootBundle` 读取，无需改动原生工程。
   assets:
     - assets/config/
 
 tobias:
-  # iOS 端支付宝回跳依赖 URL Scheme，这里先放学习阶段占位值。
+  # iOS 端支付宝回跳依赖 URL Scheme，这里先放占位值。
   url_scheme: myfirstappalipay
 
 fluwx:
-  # `pubspec.yaml` 里的值主要用于原生工程自动配置占位，
-  # 真正初始化微信 SDK 仍会在 Flutter 代码里显式调用 registerApi。
+  # 这里仅用于原生工程自动配置占位，
+  # 真正的微信 SDK 初始化在 Flutter 代码中显式调用 registerApi。
   app_id: wx1234567890abcdef
   universal_link: https://example.com/wechat/link/
   scene_delegate: true
-
-  # 图片资源可以配置多分辨率变体，具体可参考：
-  # https://flutter.dev/to/resolution-aware-images
-
-  # 如果资源来自依赖包，可参考：
-  # https://flutter.dev/to/asset-from-package
-
-  # 如果后续要引入自定义字体，也是在 `flutter` 节点下配置。
-  # 每组字体需要声明 `family`，并在 `fonts` 里列出具体字体文件。
-  # 示例：
-  # fonts:
-  #   - family: Schyler
-  #     fonts:
-  #       - asset: fonts/Schyler-Regular.ttf
-  #       - asset: fonts/Schyler-Italic.ttf
-  #         style: italic
-  #   - family: Trajan Pro
-  #     fonts:
-  #       - asset: fonts/TrajanPro.ttf
-  #       - asset: fonts/TrajanPro_Bold.ttf
-  #         weight: 700
-  #
-  # 如果字体来自依赖包，可参考：
-  # see https://flutter.dev/to/font-from-package

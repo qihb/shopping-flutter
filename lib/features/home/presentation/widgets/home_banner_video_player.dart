@@ -171,8 +171,8 @@ class _HomeBannerVideoPlayerState extends State<HomeBannerVideoPlayer> {
 
 /// 视频播放控件条。
 ///
-/// 它负责展示播放时间、总时长和进度条。
-/// 你可以把它理解成视频播放器底部那一排“信息 + 控制器”的 UI 组件。
+/// 负责展示播放时间、总时长和进度条，
+/// 是视频播放器底部的“信息 + 控制器”UI 组件。
 class HomeBannerVideoControls extends StatelessWidget {
   final Duration currentPosition;
   final Duration totalDuration;

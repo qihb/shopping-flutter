@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 让当前 Flutter 电商学习项目具备“购物车提交订单 -> 我的页面查看订单状态、个人信息和基础设置”的最小可用闭环。
+**Goal:** 让当前 Flutter 电商项目具备“购物车提交订单 -> 我的页面查看订单状态、个人信息和基础设置”的最小可用闭环。
 
 **Architecture:** 继续沿用 `MainTabPage` 作为当前阶段的轻量状态承接点，不引入额外状态管理库。购物车、订单、个人资料和基础设置都先用本地内存状态组织，再通过 `CartPage` 和 `ProfilePage` 负责展示与交互回调。
 

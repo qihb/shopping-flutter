@@ -2,11 +2,11 @@ import 'package:my_first_app/app/config/app_environment.dart';
 
 /// 应用运行时配置。
 ///
-/// 你可以把它理解成“启动后全局可读的一份配置对象”：
-/// - 当前是哪个环境
+/// 启动后全局可读的配置对象，包含：
+/// - 当前环境
 /// - 当前环境对应的应用标题
-/// - 接口基础地址是什么
-/// - 是否打开调试辅助能力
+/// - 接口基础地址
+/// - 是否启用调试辅助能力
 class AppConfig {
   final AppEnvironment environment;
   final String appName;

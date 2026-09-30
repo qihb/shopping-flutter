@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 为当前 Flutter 学习项目补充一套团队级 Dart / Flutter 书写规范，并按同一套标准整理现有源码结构。
+**Goal:** 为当前 Flutter 项目补充一套团队级 Dart / Flutter 书写规范，并按同一套标准整理现有源码结构。
 
-**Architecture:** 本次不改业务行为，只统一代码组织方式、类内成员顺序、`const` 使用和学习型注释的落点。整理范围以 `lib/` 下现有 Dart 源码为主，最后用格式化、`flutter analyze` 和 `flutter test` 验证整理结果。
+**Architecture:** 本次不改业务行为，只统一代码组织方式、类内成员顺序、`const` 使用和说明性注释的落点。整理范围以 `lib/` 下现有 Dart 源码为主，最后用格式化、`flutter analyze` 和 `flutter test` 验证整理结果。
 
 **Tech Stack:** Dart、Flutter、Material 3、`dart format`、`flutter analyze`、`flutter test`
 
@@ -24,7 +24,7 @@
 1. 类内成员顺序
 2. Model 与 Widget 的常见写法
 3. const / final 的使用原则
-4. 学习型注释的落点
+4. 说明性注释的落点
 5. AI 生成代码后的复核要求
 ```
 
@@ -39,12 +39,12 @@
 - 生成代码后必须按这份顺序自检
 ```
 
-- [ ] **Step 3: 保持规则语言适合当前学习项目**
+- [ ] **Step 3: 保持规则语言适合当前项目**
 
 新增条目要继续延续项目现有风格：
 
 ```text
-- 面向 Flutter 初学者
+- 面向 Flutter 开发者
 - 强调为什么这样排更容易读
 - 不引入过重、过学术化的规范术语
 ```

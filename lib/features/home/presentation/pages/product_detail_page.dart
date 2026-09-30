@@ -4,13 +4,8 @@ import 'package:my_first_app/features/home/presentation/models/home_recommend_pr
 
 /// 商品详情页。
 ///
-/// 这里先做一个适合当前学习阶段的详情页初版：
-/// - 顶部商品展示区
-/// - 商品标签、标题、价格和简介
-/// - 底部操作按钮
-///
-/// 这样一来，首页的推荐商品就不只是“能看到”，
-/// 而是已经具备了“点进去继续浏览”的基本链路。
+/// 页面包含顶部商品展示区、标签/标题/价格/简介信息区与底部操作按钮，
+/// 承接首页推荐商品的“点击进入详情”链路。
 class ProductDetailPage extends StatelessWidget {
   final HomeRecommendProduct product;
   final VoidCallback? onAddToCart;
@@ -46,7 +41,7 @@ class ProductDetailPage extends StatelessWidget {
             runSpacing: 8,
             children: [
               _ProductTagChip(label: product.tag),
-              const _ProductTagChip(label: '详情初版'),
+              const _ProductTagChip(label: '精选'),
             ],
           ),
           const SizedBox(height: 16),
@@ -76,7 +71,7 @@ class ProductDetailPage extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '这一版先用静态文案模拟商品详情页的核心信息区，后面可以继续补轮播图、规格选择、评价和详情图文。',
+            '该区域展示商品的核心卖点与规格说明，具体参数与售后以实际商品为准。',
             style: textTheme.bodyMedium?.copyWith(height: 1.6),
           ),
           const SizedBox(height: 24),

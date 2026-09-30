@@ -3,8 +3,7 @@ import 'package:my_first_app/features/profile/presentation/models/user_address.d
 
 /// 订单状态。
 ///
-/// 这里先用 `enum` 把订单状态收拢起来，
-/// 这样比在页面里到处散落字符串更安全，也更适合后续继续补状态流转。
+/// 使用 `enum` 统一订单状态，避免在页面里散落字符串，并便于状态流转。
 enum OrderStatus {
   pendingPayment,
   pendingShipment,
@@ -42,12 +41,11 @@ extension OrderStatusExtension on OrderStatus {
   bool get canAdvance => nextStatus != null;
 }
 
-/// 订单记录。
+/// 订单记录模型。
 ///
-/// 当前阶段先把订单做成一个轻量模型，
-/// 目的是让购物车提交后，"我的" 页面有一份明确的数据可以展示。
+/// 承载购物车提交后生成的订单数据，供“我的”页面展示。
 class OrderRecord {
-  static const List<OrderRecord> learningSamples = <OrderRecord>[
+  static const List<OrderRecord> sampleOrders = <OrderRecord>[
     OrderRecord(
       id: 'SAMPLE-1001',
       items: <CartItem>[
@@ -124,8 +122,7 @@ class OrderRecord {
     required this.shippingAddress,
   });
 
-  /// 这里先直接从购物车条目生成订单，
-  /// 可以先把它理解成“下单时把当前购物车快照保存下来”。
+  /// 从购物车条目生成订单，即“下单时保存当前购物车快照”。
   factory OrderRecord.fromCartItems({
     required String id,
     required List<CartItem> items,

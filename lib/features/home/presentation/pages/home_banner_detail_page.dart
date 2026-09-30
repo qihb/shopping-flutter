@@ -6,8 +6,7 @@ import 'package:my_first_app/features/home/presentation/widgets/home_banner_vide
 
 /// 首页横幅详情页。
 ///
-/// 这里先用一个独立页面承接轮播卡片点击后的去向，
-/// 方便后续继续扩展成活动页、专题页或商品聚合页。
+/// 承接轮播卡片点击后的去向，可扩展为活动页、专题页或商品聚合页。
 class HomeBannerDetailPage extends StatelessWidget {
   final HomeBannerItem item;
 
@@ -63,8 +62,8 @@ class HomeBannerDetailPage extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             item.isVideo
-                ? '这里已经接入真实视频播放组件，适合继续学习初始化控制器、播放暂停和异常兜底这些 Flutter 视频能力。'
-                : '这里先用生成的图片海报模拟专题详情页，后续可以继续补商品瀑布流、活动规则和更多素材。',
+                ? '本专题以视频呈现核心内容，支持播放控制与异常兜底，后续可扩展商品挂载与活动跳转。'
+                : '本专题以图片海报呈现核心内容，后续可扩展商品瀑布流、活动规则与更多素材。',
             style: textTheme.bodyMedium?.copyWith(height: 1.6),
           ),
           const SizedBox(height: 24),

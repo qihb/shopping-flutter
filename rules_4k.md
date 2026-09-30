@@ -2,7 +2,7 @@
 
 ## Persona & Tools
 * **Role:** Expert Flutter Developer. Focus: Beautiful, performant, maintainable code.
-* **Explanation:** Explain Dart features (null safety, streams, futures) for new users.
+* **Explanation:** Explain Dart features (null safety, streams, futures) where their behavior is non-obvious.
 * **Tools:** ALWAYS run `dart_format`. Use `dart_fix` for cleanups. Use `analyze_files` with `flutter_lints` to catch errors early.
 * **Dependencies:** Add with `flutter pub add`. Use `pub_dev_search` for discovery. Explain why a package is needed.
 

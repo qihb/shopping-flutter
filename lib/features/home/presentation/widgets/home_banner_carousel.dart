@@ -9,8 +9,7 @@ import 'package:my_first_app/features/home/presentation/widgets/home_banner_vide
 
 /// 首页焦点横幅轮播。
 ///
-/// 这里改成 `StatefulWidget`，是因为当前页索引和自动轮播计时器都会变化。
-/// 你可以把它理解成“横幅区自己维护一小块交互状态”。
+/// 使用 `StatefulWidget`，因为当前页索引和自动轮播计时器都是可变状态。
 class HomeBannerCarousel extends StatefulWidget {
   final ValueChanged<HomeBannerItem>? onItemTap;
 
@@ -25,7 +24,7 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
     HomeBannerItem(
       title: '露营装备开箱',
       subtitle: '视频短片',
-      description: '用动态内容位模拟活动短视频入口，适合放新品介绍或种草内容。',
+      description: '露营装备开箱专题，涵盖新品介绍与种草内容。',
       tag: '短视频',
       buttonLabel: '查看详情',
       mediaType: HomeBannerMediaType.video,
@@ -39,7 +38,7 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
     HomeBannerItem(
       title: '城市夏日穿搭',
       subtitle: '图片专题',
-      description: '用清爽配色和通勤单品，模拟首页主视觉图片素材。',
+      description: '以清爽配色与通勤单品呈现夏日穿搭灵感。',
       tag: '今日主推',
       buttonLabel: '查看详情',
       mediaType: HomeBannerMediaType.image,
@@ -50,7 +49,7 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
     HomeBannerItem(
       title: '轻旅收纳指南',
       subtitle: '图片专题',
-      description: '把箱包和收纳主题做成第二张图片横幅，丰富首页轮播节奏。',
+      description: '箱包与收纳主题精选，丰富首页轮播内容。',
       tag: '搭配灵感',
       buttonLabel: '查看详情',
       mediaType: HomeBannerMediaType.image,
@@ -61,7 +60,7 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
     HomeBannerItem(
       title: '夜跑鞋科技解析',
       subtitle: '视频短片',
-      description: '第二条视频内容位可以承接卖点讲解、达人测评或活动宣传。',
+      description: '夜跑鞋科技解析，涵盖卖点讲解、达人测评与活动宣传。',
       tag: '热播中',
       buttonLabel: '查看详情',
       mediaType: HomeBannerMediaType.video,
@@ -113,8 +112,7 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
       return;
     }
 
-    // `Navigator.push` 可以理解成“把一个新页面压到页面栈顶”。
-    // 这和前端里点击卡片后进入详情路由是类似的体验。
+    // `Navigator.push` 将新页面压入页面栈顶，实现进入详情。
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => HomeBannerDetailPage(item: item)),
     );

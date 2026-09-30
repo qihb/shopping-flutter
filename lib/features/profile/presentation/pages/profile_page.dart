@@ -138,8 +138,7 @@ class _OrderStatusOverview extends StatelessWidget {
   });
 
   void _openOrderRecordPage(BuildContext context, String statusLabel) {
-    // `Navigator.push` 可以先类比成网页里的“进入下一层详情页”。
-    // 这里点击订单状态后，会打开一个新的订单记录页面。
+    // 点击订单状态后，打开新的订单记录页面。
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (context) => OrderRecordPage(

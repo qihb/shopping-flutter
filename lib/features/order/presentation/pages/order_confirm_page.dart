@@ -6,11 +6,9 @@ import 'package:my_first_app/features/profile/presentation/models/user_address.d
 
 /// 订单确认页。
 ///
-/// 它位于“购物车”和“订单生成”之间，
-/// 作用可以先理解成网页结算页里的“最后确认信息”步骤。
+/// 位于“购物车”和“订单生成”之间，对应结算流程中的“最后确认信息”步骤。
 ///
-/// 这里改成 `StatefulWidget`，是因为“当前选中了哪种支付方式”
-/// 属于页面内部的本地交互状态。
+/// 使用 `StatefulWidget`，因为“当前选中的支付方式”属于页面本地交互状态。
 class OrderConfirmPage extends StatefulWidget {
   final List<CartItem> items;
   final UserAddress address;

@@ -5,15 +5,14 @@ import 'package:my_first_app/features/home/presentation/pages/product_detail_pag
 
 /// 分类页。
 ///
-/// 这里把页面改成了“左侧分类导航 + 右侧商品网格”的双栏结构，
-/// 这是电商 App 里很常见的一种分类页组织方式。
+/// 采用“左侧分类导航 + 右侧商品网格”的双栏结构，
+/// 这是电商 App 常见的分类页组织方式。
 ///
-/// 左边更像“当前浏览的大类目录”，右边则展示当前分类下的商品卡片列表。
-/// 先把这个基础骨架搭起来，后面再继续接筛选、二级分类和真实数据。
+/// 左侧展示当前浏览的大类目录，右侧展示对应分类下的商品卡片列表，
+/// 后续可继续接入筛选、二级分类与真实数据。
 class CategoryPage extends StatefulWidget {
-  /// 这个参数用来承接“从首页点某个分类后，分类页应该默认选中谁”。
-  ///
-  /// 你可以先把它理解成网页里进入页面时携带的初始筛选条件。
+  /// 承接“从首页点击某个分类后，分类页默认选中哪个分类”，
+  /// 等价于进入页面时携带的初始筛选条件。
   final String? initialCategoryLabel;
   final ValueChanged<HomeRecommendProduct>? onAddToCart;
 
@@ -61,7 +60,7 @@ class _CategoryPageState extends State<CategoryPage> {
   }) {
     final HomeRecommendProduct detailProduct = HomeRecommendProduct(
       name: product.name,
-      description: '${section.label}分类里的精选单品，后面可以继续补更完整的商品卖点说明。',
+      description: '${section.label}分类精选单品。',
       priceLabel: 'EUR ${product.priceLabel}',
       tag: section.label,
     );
@@ -135,8 +134,7 @@ class _CategoryPageState extends State<CategoryPage> {
             ),
           ),
           Expanded(
-            // `Expanded` 会让右侧内容区占满 `Row` 剩余空间。
-            // 在双栏布局里，这是一种很常见的写法。
+            // `Expanded` 占满 `Row` 剩余空间，让右侧内容区铺满。
             child: Container(
               color: colorScheme.surface,
               child: CustomScrollView(
@@ -353,7 +351,7 @@ class _CategoryProduct {
 const List<_CategorySection> _categorySections = [
   _CategorySection(
     label: '服饰',
-    description: '先用 1 行 4 个的商品网格，模拟电商分类页里常见的商品入口排布。',
+    description: '精选上装、下装与基础单品，覆盖日常通勤与运动穿搭。',
     products: [
       _CategoryProduct(
         name: '运动速干T恤',
@@ -415,7 +413,7 @@ const List<_CategorySection> _categorySections = [
   ),
   _CategorySection(
     label: '鞋靴',
-    description: '鞋靴区后面可以继续补热门系列、尺码筛选和穿搭推荐。',
+    description: '精选跑鞋、板鞋与户外鞋款，满足通勤与户外场景。',
     products: [
       _CategoryProduct(
         name: '轻弹跑鞋',
@@ -449,7 +447,7 @@ const List<_CategorySection> _categorySections = [
   ),
   _CategorySection(
     label: '箱包',
-    description: '箱包页适合继续练习瀑布流、标签角标和商品卡片复用。',
+    description: '精选双肩包、托特包与收纳包，覆盖通勤、商务与旅行场景。',
     products: [
       _CategoryProduct(
         name: '极简双肩包',
@@ -483,7 +481,7 @@ const List<_CategorySection> _categorySections = [
   ),
   _CategorySection(
     label: '数码',
-    description: '数码分类可以继续扩展成品牌区、参数卡和专题推荐。',
+    description: '精选耳机、音箱与桌面数码配件，提升影音与办公体验。',
     products: [
       _CategoryProduct(
         name: '主动降噪耳机',
@@ -517,7 +515,7 @@ const List<_CategorySection> _categorySections = [
   ),
   _CategorySection(
     label: '家居',
-    description: '家居分类很适合继续学习更丰富的卡片排版和分组展示。',
+    description: '精选香薰、抱枕与收纳好物，营造舒适居家氛围。',
     products: [
       _CategoryProduct(
         name: '香薰氛围灯',
@@ -551,7 +549,7 @@ const List<_CategorySection> _categorySections = [
   ),
   _CategorySection(
     label: '食品',
-    description: '食品区后面可以继续补活动标签、组合装和口味筛选。',
+    description: '精选坚果、麦片与代餐零食，适合通勤与日常补给。',
     products: [
       _CategoryProduct(
         name: '坚果能量包',

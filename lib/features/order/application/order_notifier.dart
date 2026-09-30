@@ -23,9 +23,9 @@ class OrderNotifier extends ChangeNotifier {
   /// 订单列表（不可变视图）。
   List<OrderRecord> get orders => List<OrderRecord>.unmodifiable(_orders);
 
-  /// 用于展示的订单列表：真实订单为空时，返回学习示例数据。
+  /// 用于展示的订单列表：真实订单为空时返回示例数据。
   List<OrderRecord> get displayOrders =>
-      _orders.isEmpty ? OrderRecord.learningSamples : orders;
+      _orders.isEmpty ? OrderRecord.sampleOrders : orders;
 
   /// 提交新订单。
   ///

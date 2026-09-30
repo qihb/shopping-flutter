@@ -65,8 +65,8 @@ void main() {
     expect(completedOrder.advanceStatus(), same(completedOrder));
   });
 
-  test('OrderRecord.learningSamples 会提供不同状态的学习型示例订单', () {
-    final List<OrderStatus> statuses = OrderRecord.learningSamples
+  test('OrderRecord.sampleOrders 会提供不同状态的示例订单', () {
+    final List<OrderStatus> statuses = OrderRecord.sampleOrders
         .map((order) => order.status)
         .toList(growable: false);
 
