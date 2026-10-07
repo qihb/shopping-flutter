@@ -11,6 +11,10 @@ import 'package:my_first_app/app/config/app_config.dart';
 import 'package:my_first_app/app/config/app_config_store.dart';
 import 'package:my_first_app/app/config/app_environment.dart';
 import 'package:my_first_app/core/api/api_client.dart';
+import 'package:my_first_app/features/auth/application/auth_notifier.dart';
+import 'package:my_first_app/features/auth/data/auth_service.dart';
+import 'package:my_first_app/features/auth/data/models/user_info.dart';
+import 'package:my_first_app/features/auth/data/token_store.dart';
 import 'package:my_first_app/features/home/data/home_recommend_mock_service.dart';
 import 'package:my_first_app/features/home/data/home_recommend_service.dart';
 import 'package:my_first_app/features/home/presentation/models/home_banner_item.dart';
@@ -18,6 +22,42 @@ import 'package:my_first_app/features/home/presentation/models/home_recommend_pr
 import 'package:my_first_app/features/home/presentation/pages/home_banner_detail_page.dart';
 import 'package:my_first_app/features/home/presentation/widgets/home_banner_carousel.dart';
 import 'package:my_first_app/features/home/presentation/widgets/home_banner_video_player.dart';
+
+/// 测试用的登录服务，不发起真实网络请求。
+class _FakeAuthService extends AuthService {
+  _FakeAuthService()
+      : super(
+          apiClient: ApiClient(baseUrl: 'https://test.local'),
+          tokenStore: InMemoryTokenStore(),
+        );
+
+  @override
+  Future<LoginResult> login({
+    required String username,
+    required String password,
+  }) async {
+    return LoginResult(
+      token: 'test-token',
+      user: UserInfo(id: 1, username: username, nickname: '', phone: ''),
+    );
+  }
+
+  @override
+  Future<void> register({
+    required String username,
+    required String password,
+    String? nickname,
+    String? phone,
+  }) async {}
+
+  @override
+  Future<void> logout() async {}
+
+  @override
+  Future<UserInfo> fetchCurrentUser() async {
+    return const UserInfo(id: 1, username: 'tester', nickname: '', phone: '');
+  }
+}
 
 /// 测试用的推荐服务，封装原有的 mock 数据。
 class _TestRecommendService extends HomeRecommendService {
@@ -39,6 +79,11 @@ Widget _buildTestMyApp() {
     recommendService: _TestRecommendService(
       apiClient: ApiClient(baseUrl: 'https://test.local'),
     ),
+    // 测试环境注入不依赖平台通道的登录态，避免 SharedPreferences 卡住测试。
+    authNotifier: AuthNotifier(
+      authService: _FakeAuthService(),
+      tokenStore: InMemoryTokenStore(),
+    )..restoreSession(),
   );
 }
 
@@ -93,7 +138,8 @@ void main() {
 
     await tester.tap(find.text('我的'));
     await tester.pumpAndSettle();
-    expect(find.text('Hi, Qi Hai Bing'), findsOneWidget);
+    // 测试环境未登录，“我的”页应展示访客视图。
+    expect(find.text('Hi，访客'), findsOneWidget);
     expect(find.text('订单状态'), findsWidgets);
     expect(find.text('待付款'), findsWidgets);
     expect(find.text('待发货'), findsWidgets);

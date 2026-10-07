@@ -39,6 +39,13 @@
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!-- ATS 例外：允许明文 HTTP 请求，供本地开发环境 (http://localhost:6001) 联调。
+	     上线生产环境启用 HTTPS 后应移除此配置。 -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>weixin</string>

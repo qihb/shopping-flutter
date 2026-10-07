@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:my_first_app/features/auth/application/auth_notifier.dart';
+import 'package:my_first_app/features/auth/data/models/user_info.dart';
+import 'package:my_first_app/features/auth/presentation/pages/login_page.dart';
 import 'package:my_first_app/features/cart/application/cart_notifier.dart';
 import 'package:my_first_app/features/cart/presentation/pages/cart_page.dart';
 import 'package:my_first_app/features/category/presentation/pages/category_page.dart';
@@ -39,14 +42,20 @@ class _MainTabPageState extends State<MainTabPage> {
 
   // ---------- 辅助 getter ----------
 
-  /// 个人信息摘要，依赖地址 Notifier 计算默认地址。
+  /// 个人信息摘要。
+  ///
+  /// 已登录时优先用后端返回的用户信息（昵称 > 用户名），
+  /// 未登录时回退到访客占位信息，由页面侧引导登录。
   UserProfileSummary _profile({
     required AddressNotifier addressNotifier,
+    required AuthNotifier authNotifier,
   }) {
-    const UserProfileSummary baseProfile = UserProfileSummary(
-      displayName: 'Qi Hai Bing',
-      email: 'qihaibing@example.com',
-      memberLabel: '成长会员',
+    final UserInfo? user = authNotifier.user;
+
+    final UserProfileSummary baseProfile = UserProfileSummary(
+      displayName: user?.displayName ?? '访客',
+      phone: user?.phone ?? '',
+      memberLabel: user != null ? '成长会员' : '',
       defaultAddress: '上海市浦东新区张江高科',
     );
 
@@ -207,6 +216,21 @@ class _MainTabPageState extends State<MainTabPage> {
     context.read<SettingsNotifier>().updatePriceAlert(value);
   }
 
+  // ---------- 登录态 ----------
+
+  void _openLoginPage(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (context) => const LoginPage()),
+    );
+  }
+
+  Future<void> _logout(BuildContext context) async {
+    await context.read<AuthNotifier>().logout();
+    if (context.mounted) {
+      _showMessage(context, '已退出登录');
+    }
+  }
+
   // ---------- 默认地址 ----------
 
   void _setDefaultAddress(BuildContext context, UserAddress address) {
@@ -240,9 +264,14 @@ class _MainTabPageState extends State<MainTabPage> {
           final AddressNotifier addressNotifier = ctx.watch<AddressNotifier>();
           final SettingsNotifier settingsNotifier = ctx.watch<SettingsNotifier>();
           final OrderNotifier orderNotifier = ctx.watch<OrderNotifier>();
+          final AuthNotifier authNotifier = ctx.watch<AuthNotifier>();
 
           return ProfilePage(
-            profile: _profile(addressNotifier: addressNotifier),
+            profile: _profile(
+              addressNotifier: addressNotifier,
+              authNotifier: authNotifier,
+            ),
+            isLoggedIn: authNotifier.isAuthenticated,
             addresses: addressNotifier.addresses,
             settings: settingsNotifier.settings,
             orders: orderNotifier.displayOrders,
@@ -260,6 +289,8 @@ class _MainTabPageState extends State<MainTabPage> {
                 _updateBiometricSetting(context, value),
             onPriceAlertChanged: (value) =>
                 _updatePriceAlertSetting(context, value),
+            onLogin: () => _openLoginPage(context),
+            onLogout: () => _logout(context),
           );
         },
       ),

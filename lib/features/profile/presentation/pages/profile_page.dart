@@ -13,6 +13,7 @@ import 'package:my_first_app/features/profile/presentation/pages/address_managem
 /// 这一版先承接“订单查看”这条链路，后面再继续补个人信息和基础设置。
 class ProfilePage extends StatelessWidget {
   final UserProfileSummary profile;
+  final bool isLoggedIn;
   final List<UserAddress> addresses;
   final ProfileSettings settings;
   final List<OrderRecord> orders;
@@ -22,10 +23,13 @@ class ProfilePage extends StatelessWidget {
   final ValueChanged<bool>? onNotificationChanged;
   final ValueChanged<bool>? onBiometricUnlockChanged;
   final ValueChanged<bool>? onPriceAlertChanged;
+  final VoidCallback? onLogin;
+  final VoidCallback? onLogout;
 
   const ProfilePage({
     super.key,
     required this.profile,
+    this.isLoggedIn = true,
     this.addresses = const <UserAddress>[],
     required this.settings,
     this.orders = const <OrderRecord>[],
@@ -35,6 +39,8 @@ class ProfilePage extends StatelessWidget {
     this.onNotificationChanged,
     this.onBiometricUnlockChanged,
     this.onPriceAlertChanged,
+    this.onLogin,
+    this.onLogout,
   });
 
   @override
@@ -45,7 +51,11 @@ class ProfilePage extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: [
-          _ProfileHeaderCard(profile: profile),
+          _ProfileHeaderCard(
+            profile: profile,
+            isLoggedIn: isLoggedIn,
+            onLogin: onLogin,
+          ),
           const SizedBox(height: 20),
           _OrderStatusOverview(
             orders: orders,
@@ -67,9 +77,11 @@ class ProfilePage extends StatelessWidget {
           const SizedBox(height: 20),
           _ProfileSettingsSection(
             settings: settings,
+            isLoggedIn: isLoggedIn,
             onNotificationChanged: onNotificationChanged,
             onBiometricUnlockChanged: onBiometricUnlockChanged,
             onPriceAlertChanged: onPriceAlertChanged,
+            onLogout: onLogout,
           ),
         ],
       ),
@@ -79,12 +91,18 @@ class ProfilePage extends StatelessWidget {
 
 class _ProfileHeaderCard extends StatelessWidget {
   final UserProfileSummary profile;
+  final bool isLoggedIn;
+  final VoidCallback? onLogin;
 
-  const _ProfileHeaderCard({required this.profile});
+  const _ProfileHeaderCard({
+    required this.profile,
+    required this.isLoggedIn,
+    this.onLogin,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final Widget card = Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.primaryContainer,
@@ -95,10 +113,12 @@ class _ProfileHeaderCard extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 28,
-            child: Text(
-              profile.displayName.substring(0, 1),
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
+            child: isLoggedIn
+                ? Text(
+                    profile.displayName.substring(0, 1),
+                    style: Theme.of(context).textTheme.titleLarge,
+                  )
+                : const Icon(Icons.person_outline),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -106,21 +126,46 @@ class _ProfileHeaderCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Hi, ${profile.displayName}',
+                  isLoggedIn ? 'Hi, ${profile.displayName}' : 'Hi，访客',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(profile.email),
-                const SizedBox(height: 6),
-                Text('会员等级 ${profile.memberLabel}'),
+                // 联系方式按“手机号 > 邮箱”的优先级展示，都没有时引导登录。
+                if (isLoggedIn) ...<Widget>[
+                  Text(
+                    profile.phone.isNotEmpty
+                        ? profile.phone
+                        : profile.email.isNotEmpty
+                            ? profile.email
+                            : '暂无联系方式',
+                  ),
+                  const SizedBox(height: 6),
+                  Text('会员等级 ${profile.memberLabel}'),
+                ] else
+                  Text('点击登录后可同步订单与购物车'),
                 const SizedBox(height: 6),
                 Text('默认地址 ${profile.defaultAddress}'),
               ],
             ),
           ),
         ],
+      ),
+    );
+
+    if (isLoggedIn) {
+      return card;
+    }
+
+    // 未登录时整张卡片可点击，直接进入登录页。
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: const ValueKey<String>('profile-login-entry'),
+        borderRadius: BorderRadius.circular(24),
+        onTap: onLogin,
+        child: card,
       ),
     );
   }
@@ -321,15 +366,19 @@ class _ProfileLatestOrderCard extends StatelessWidget {
 
 class _ProfileSettingsSection extends StatelessWidget {
   final ProfileSettings settings;
+  final bool isLoggedIn;
   final ValueChanged<bool>? onNotificationChanged;
   final ValueChanged<bool>? onBiometricUnlockChanged;
   final ValueChanged<bool>? onPriceAlertChanged;
+  final VoidCallback? onLogout;
 
   const _ProfileSettingsSection({
     required this.settings,
+    required this.isLoggedIn,
     this.onNotificationChanged,
     this.onBiometricUnlockChanged,
     this.onPriceAlertChanged,
+    this.onLogout,
   });
 
   @override
@@ -375,6 +424,14 @@ class _ProfileSettingsSection extends StatelessWidget {
                   value: settings.enablePriceAlert,
                   onChanged: onPriceAlertChanged,
                 ),
+                // 只有登录后才展示退出登录入口。
+                if (isLoggedIn)
+                  ListTile(
+                    key: const ValueKey<String>('profile-logout-entry'),
+                    leading: const Icon(Icons.logout),
+                    title: const Text('退出登录'),
+                    onTap: onLogout,
+                  ),
               ],
             ),
           ),

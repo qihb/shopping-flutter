@@ -1,8 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 允许明文 HTTP 请求，供本地开发环境 (http://10.0.2.2:6001 / localhost:6001) 联调。
+         上线生产环境启用 HTTPS 后应移除此配置。 -->
     <application
         android:label="my_first_app"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -4,6 +4,10 @@ import 'package:provider/provider.dart';
 
 import 'package:my_first_app/app/presentation/pages/main_tab_page.dart';
 import 'package:my_first_app/core/api/api_client.dart';
+import 'package:my_first_app/features/auth/application/auth_notifier.dart';
+import 'package:my_first_app/features/auth/data/auth_service.dart';
+import 'package:my_first_app/features/auth/data/models/user_info.dart';
+import 'package:my_first_app/features/auth/data/token_store.dart';
 import 'package:my_first_app/features/cart/application/cart_notifier.dart';
 import 'package:my_first_app/features/home/data/home_recommend_mock_service.dart';
 import 'package:my_first_app/features/home/data/home_recommend_service.dart';
@@ -17,6 +21,44 @@ import 'package:my_first_app/features/payment/presentation/models/payment_result
 import 'package:my_first_app/features/profile/application/address_notifier.dart';
 import 'package:my_first_app/features/profile/application/settings_notifier.dart';
 import 'package:my_first_app/features/profile/presentation/models/user_address.dart';
+
+/// 测试用的登录服务，不发起真实网络请求。
+///
+/// 测试里统一按“未登录”处理，不触发任何登录态变化。
+class _FakeAuthService extends AuthService {
+  _FakeAuthService()
+      : super(
+          apiClient: ApiClient(baseUrl: 'https://test.local'),
+          tokenStore: InMemoryTokenStore(),
+        );
+
+  @override
+  Future<LoginResult> login({
+    required String username,
+    required String password,
+  }) async {
+    return LoginResult(
+      token: 'test-token',
+      user: UserInfo(id: 1, username: username, nickname: '', phone: ''),
+    );
+  }
+
+  @override
+  Future<void> register({
+    required String username,
+    required String password,
+    String? nickname,
+    String? phone,
+  }) async {}
+
+  @override
+  Future<void> logout() async {}
+
+  @override
+  Future<UserInfo> fetchCurrentUser() async {
+    return const UserInfo(id: 1, username: 'tester', nickname: '', phone: '');
+  }
+}
 
 /// 测试用的推荐服务，封装原有的 mock 数据。
 ///
@@ -53,6 +95,12 @@ Widget _buildTestApp({
 
   return MultiProvider(
     providers: [
+      ChangeNotifierProvider<AuthNotifier>(
+        create: (_) => AuthNotifier(
+          authService: _FakeAuthService(),
+          tokenStore: InMemoryTokenStore(),
+        )..restoreSession(),
+      ),
       ChangeNotifierProvider<CartNotifier>(create: (_) => CartNotifier()),
       ChangeNotifierProvider<OrderNotifier>(
         create: (_) => OrderNotifier(paymentService: service),

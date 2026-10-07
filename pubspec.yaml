@@ -27,8 +27,12 @@ dependencies:
   # `provider` 基于 `ChangeNotifier` + `InheritedWidget` 的轻量状态管理，
   # 用于承载购物车、订单、地址等跨页面共享状态。
   provider: ^6.1.5
-  # `http` 是 Dart 官方提供的 HTTP 客户端，用于发起网络请求。
-  http: ^1.6.0
+  # `dio` 是 Flutter 社区事实标准的网络库（请求/响应拦截器、超时、取消、FormData），
+  # 取代自写的 http 薄封装，拦截器能力由它的 Interceptor 体系提供。
+  dio: ^5.7.0
+  # `shared_preferences` 是 Flutter 官方提供的键值对本地存储插件，
+  # 用于持久化登录 token 和设备 clientId，保证冷启动后登录态不丢。
+  shared_preferences: ^2.5.3
 
 dev_dependencies:
   flutter_test:

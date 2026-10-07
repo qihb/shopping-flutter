@@ -1,6 +1,6 @@
 {
   "appName": "My First App Dev",
-  "apiBaseUrl": "https://dev-api.example.com",
+  "apiBaseUrl": "http://localhost:6001",
   "enableDebugTools": true,
   "enableRealPayment": false,
   "alipayAppId": "mock-dev-alipay-app-id",

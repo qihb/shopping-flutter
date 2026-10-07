@@ -4,6 +4,10 @@ import 'package:provider/provider.dart';
 import 'package:my_first_app/app/config/app_config_store.dart';
 import 'package:my_first_app/app/presentation/pages/main_tab_page.dart';
 import 'package:my_first_app/app/theme/app_theme.dart';
+import 'package:my_first_app/core/api/api_client.dart';
+import 'package:my_first_app/features/auth/application/auth_notifier.dart';
+import 'package:my_first_app/features/auth/data/auth_service.dart';
+import 'package:my_first_app/features/auth/data/token_store.dart';
 import 'package:my_first_app/features/cart/application/cart_notifier.dart';
 import 'package:my_first_app/features/home/data/home_recommend_service.dart';
 import 'package:my_first_app/features/order/application/order_notifier.dart';
@@ -24,7 +28,36 @@ class MyApp extends StatelessWidget {
   /// 可选注入的推荐服务，主要用于测试。
   final HomeRecommendService? recommendService;
 
-  const MyApp({super.key, this.recommendService});
+  /// 可选注入的登录态 Notifier，主要用于测试时替换真实网络实现。
+  final AuthNotifier? authNotifier;
+
+  const MyApp({super.key, this.recommendService, this.authNotifier});
+
+  /// 创建真实环境的登录态管理。
+  ///
+  /// 装配关系：
+  /// - [SharedPrefsTokenStore] 负责本地持久化 token / clientId
+  /// - [ApiClient] 每次请求前通过 tokenProvider 读最新 token 注入请求头
+  /// - [AuthService] 对接后端认证接口
+  /// - [AuthNotifier.restoreSession] 在 App 启动时尝试恢复登录态
+  AuthNotifier _createAuthNotifier() {
+    final TokenStore tokenStore = SharedPrefsTokenStore();
+    final ApiClient apiClient = ApiClient(
+      baseUrl: AppConfigStore.instance.apiBaseUrl,
+      tokenProvider: tokenStore.readToken,
+    );
+    final AuthService authService = AuthService(
+      apiClient: apiClient,
+      tokenStore: tokenStore,
+    );
+
+    // `..` 是 Dart 的级联语法，对同一个对象连续调用，
+    // 这里等价于：先创建 Notifier，再异步触发一次会话恢复。
+    return AuthNotifier(
+      authService: authService,
+      tokenStore: tokenStore,
+    )..restoreSession();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +65,9 @@ class MyApp extends StatelessWidget {
 
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider<AuthNotifier>(
+          create: (_) => authNotifier ?? _createAuthNotifier(),
+        ),
         ChangeNotifierProvider<CartNotifier>(
           create: (_) => CartNotifier(),
         ),

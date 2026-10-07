@@ -1,101 +1,152 @@
-import 'dart:convert';
-
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 
 import 'package:my_first_app/core/api/api_exception.dart';
 
 /// HTTP API 客户端。
 ///
-/// 它把 `http` 包的使用细节封装起来：
-/// - 统一拼接 baseUrl
-/// - 统一设置请求头
-/// - 统一处理 HTTP 状态码和异常
+/// 底层基于社区标准网络库 `dio`，本类只做项目级的统一封装：
+/// - 统一拼接 baseUrl 与超时时间
+/// - 通过拦截器在每次请求前注入登录 token（等价于 axios 的请求拦截器）
+/// - 把 dio 的 [DioException] 统一翻译成项目自己的 [ApiException]
 ///
-/// 构造函数接受可选的 `http.Client`，方便测试时注入 Mock Client。
-/// 这和前端里 axios/fetch 封装层的思路是一致的。
+/// `dio` 的能力（拦截器链、取消、重试、日志）都可以通过 [dio] 实例扩展，
+/// 业务层永远只面向本类的方法，不直接接触 dio 类型。
 class ApiClient {
-  final String baseUrl;
-  final http.Client _client;
+  final Dio dio;
+
+  /// 登录 token 提供者。
+  ///
+  /// 每次请求前回调一次，返回 `null` 表示当前未登录、不带 Authorization 头。
+  /// 用回调而不是直接存 token 字符串，是因为 token 会在登录/退出时变化，
+  /// 回调可以保证每次请求都拿到最新值（类似 axios 拦截器里读 store）。
+  final Future<String?> Function()? tokenProvider;
 
   ApiClient({
-    required this.baseUrl,
-    http.Client? client,
-  }) : _client = client ?? http.Client();
+    required String baseUrl,
+    HttpClientAdapter? adapter,
+    this.tokenProvider,
+  }) : dio = Dio(
+         BaseOptions(
+           baseUrl: baseUrl,
+           connectTimeout: const Duration(seconds: 15),
+           receiveTimeout: const Duration(seconds: 15),
+         ),
+       ) {
+    // 测试时通过自定义 adapter 替换真实网络传输层。
+    if (adapter != null) {
+      dio.httpClientAdapter = adapter;
+    }
+
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          if (tokenProvider != null) {
+            final String? token = await tokenProvider!();
+
+            if (token != null && token.isNotEmpty) {
+              // 后端鉴权方式为 HTTP Bearer，格式固定为 `Bearer <token>`。
+              options.headers['Authorization'] = 'Bearer $token';
+            }
+          }
+
+          handler.next(options);
+        },
+      ),
+    );
+  }
 
   /// 发起 GET 请求并返回解析后的 JSON。
   ///
-  /// [path] 是相对于 baseUrl 的路径，例如 `/products`。
+  /// [path] 是相对于 baseUrl 的路径，例如 `/api/user/me`。
   /// [queryParameters] 会以 query string 拼接到 URL 末尾。
+  /// [headers] 是本次请求的附加请求头，例如登录接口的 `X-Client-Id`。
   Future<dynamic> get(
     String path, {
     Map<String, String>? queryParameters,
+    Map<String, String>? headers,
   }) async {
-    final Uri uri = Uri.parse('$baseUrl$path').replace(
-      queryParameters: queryParameters,
+    return _request(
+      () => dio.get<dynamic>(
+        path,
+        queryParameters: queryParameters,
+        options: Options(headers: headers),
+      ),
     );
-
-    try {
-      final http.Response response = await _client.get(
-        uri,
-        headers: _defaultHeaders,
-      );
-
-      return _handleResponse(response);
-    } catch (e) {
-      if (e is ApiException) {
-        rethrow;
-      }
-
-      throw ApiException(message: '网络请求失败: $e');
-    }
   }
 
   /// 发起 POST 请求并返回解析后的 JSON。
   Future<dynamic> post(
     String path, {
     Map<String, dynamic>? body,
+    Map<String, String>? headers,
   }) async {
-    final Uri uri = Uri.parse('$baseUrl$path');
+    return _request(
+      () => dio.post<dynamic>(
+        path,
+        data: body,
+        options: Options(headers: headers),
+      ),
+    );
+  }
 
+  /// 发起 PUT 请求并返回解析后的 JSON。
+  Future<dynamic> put(
+    String path, {
+    Map<String, dynamic>? body,
+    Map<String, String>? headers,
+  }) async {
+    return _request(
+      () => dio.put<dynamic>(
+        path,
+        data: body,
+        options: Options(headers: headers),
+      ),
+    );
+  }
+
+  /// 发起 DELETE 请求并返回解析后的 JSON。
+  Future<dynamic> delete(
+    String path, {
+    Map<String, String>? headers,
+  }) async {
+    return _request(
+      () => dio.delete<dynamic>(
+        path,
+        options: Options(headers: headers),
+      ),
+    );
+  }
+
+  /// 统一执行请求并把异常翻译成 [ApiException]。
+  ///
+  /// Service 层和上层状态管理只需要认识 [ApiException] 一种网络异常类型，
+  /// 不需要感知 dio 的存在。
+  Future<dynamic> _request(Future<Response<dynamic>> Function() send) async {
     try {
-      final http.Response response = await _client.post(
-        uri,
-        headers: _defaultHeaders,
-        body: body != null ? jsonEncode(body) : null,
-      );
+      final Response<dynamic> response = await send();
+      return response.data;
+    } on DioException catch (e) {
+      final Response<dynamic>? response = e.response;
 
-      return _handleResponse(response);
-    } catch (e) {
-      if (e is ApiException) {
-        rethrow;
+      if (response != null) {
+        throw ApiException(
+          statusCode: response.statusCode,
+          message: '请求失败 (${response.statusCode}): ${response.data}',
+        );
       }
 
-      throw ApiException(message: '网络请求失败: $e');
+      final bool isTimeout = e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.sendTimeout;
+
+      throw ApiException(
+        message: isTimeout ? '网络请求超时，请稍后重试' : '网络请求失败: ${e.message}',
+      );
     }
   }
 
   /// 释放底层 HTTP 客户端资源。
   void dispose() {
-    _client.close();
-  }
-
-  Map<String, String> get _defaultHeaders => <String, String>{
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      };
-
-  dynamic _handleResponse(http.Response response) {
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      if (response.body.isEmpty) {
-        return null;
-      }
-
-      return jsonDecode(response.body);
-    }
-
-    throw ApiException(
-      statusCode: response.statusCode,
-      message: '请求失败 (${response.statusCode}): ${response.body}',
-    );
+    dio.close();
   }
 }
