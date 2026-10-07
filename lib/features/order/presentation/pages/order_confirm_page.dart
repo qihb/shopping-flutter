@@ -129,8 +129,8 @@ class _OrderConfirmPageState extends State<OrderConfirmPage> {
           _ConfirmSectionCard(
             title: '支付说明',
             child: Text(
-              '当前阶段先把支付方式选择和订单状态流转搭起来，'
-              '后续再把真实支付宝 / 微信 SDK 接进来。',
+              '支付宝已接入 SDK 调用链路，当前支付参数由本地测试数据提供，'
+              '不会产生真实扣款；微信支付与真实商户参数将在后续版本接入。',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.6),
             ),
           ),
