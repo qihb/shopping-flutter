@@ -1,5 +1,5 @@
-# Uncomment this line to define a global platform for your project
-# platform :ios, '13.0'
+# Patrol 的 iOS 原生测试组件要求明确声明最低部署目标
+platform :ios, '13.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -33,6 +33,11 @@ target 'Runner' do
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
   target 'RunnerTests' do
     inherit! :search_paths
+  end
+
+  # Patrol E2E 测试包，完整继承 Runner 的全部 pod 依赖（含 patrol 插件本身）
+  target 'RunnerUITests' do
+    inherit! :complete
   end
 end
 

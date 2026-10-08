@@ -296,6 +296,36 @@ flutter analyze
 - 每次修改都尽量让项目保持可运行。
 - 试验某个 Flutter 能力时，也应保留清晰目录和必要说明，不要留下难以理解的临时代码。
 
+### 10.1 自动化测试体系（分层测试约定）
+
+项目采用三层测试结构，按测试金字塔控制比例：
+
+- 单元测试 ~70%：`test` + `mockito`，覆盖业务逻辑、数据模型、工具函数，放在 `test/` 下与 `lib/` 目录对齐。
+- Widget 测试 ~20%：`flutter_test`，测试页面渲染、交互与状态变化。
+- E2E 测试 ~10%：`patrol`（基于 `integration_test`），只覆盖最关键的用户闭环（如游客购物流程），放在 `integration_test/`。
+
+mockito 统一约定：
+
+- 所有 Mock 集中声明在 `test/helpers/mocks.dart`，由 `build_runner` 在同目录生成 part 文件 `test/helpers/mocks.mocks.dart`，禁止在测试里手写 Fake/Stub 替身。
+- 新增被测接口后先在 `mocks.dart` 登记，再运行 `dart run build_runner build --delete-conflicting-outputs`。
+- 命名参数匹配器必须用 `anyNamed('xxx')` / `captureAnyNamed('xxx')`（mockito 5.7+ 的 `any` 仅支持位置参数）。
+
+常用命令：
+
+```bash
+flutter analyze                                  # 静态检查
+flutter test                                     # 全量单元 + Widget 测试
+dart run build_runner build --delete-conflicting-outputs  # 重新生成 Mock
+patrol build ios --simulator                     # E2E 构建隔离编译错误
+patrol test -t integration_test/guest_shopping_flow_test.dart  # iOS 模拟器跑 E2E
+```
+
+执行要求：
+
+- 每次改动后至少跑 `flutter analyze`；改业务逻辑时必须保持 `flutter test` 全绿。
+- E2E 用例依赖公网 FakeStore 接口，只在关键流程变更或发版前运行，不纳入日常提交前检查。
+- 修改页面结构（key、文案、导航）时，同步检查 `integration_test/` 里的选择器是否失效。
+
 ## 11. 电商业务优先级建议
 
 后续开发建议按这个顺序推进：

@@ -5,84 +5,39 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mockito/mockito.dart';
 
 import 'package:my_first_app/app/app.dart';
 import 'package:my_first_app/app/config/app_config.dart';
 import 'package:my_first_app/app/config/app_config_store.dart';
 import 'package:my_first_app/app/config/app_environment.dart';
-import 'package:my_first_app/core/api/api_client.dart';
 import 'package:my_first_app/features/auth/application/auth_notifier.dart';
-import 'package:my_first_app/features/auth/data/auth_service.dart';
-import 'package:my_first_app/features/auth/data/models/user_info.dart';
-import 'package:my_first_app/features/auth/data/token_store.dart';
-import 'package:my_first_app/features/home/data/home_recommend_mock_service.dart';
-import 'package:my_first_app/features/home/data/home_recommend_service.dart';
 import 'package:my_first_app/features/home/presentation/models/home_banner_item.dart';
-import 'package:my_first_app/features/home/presentation/models/home_recommend_product.dart';
 import 'package:my_first_app/features/home/presentation/pages/home_banner_detail_page.dart';
 import 'package:my_first_app/features/home/presentation/widgets/home_banner_carousel.dart';
 import 'package:my_first_app/features/home/presentation/widgets/home_banner_video_player.dart';
+import 'helpers/mocks.mocks.dart';
+import 'helpers/stub_helpers.dart';
 
-/// 测试用的登录服务，不发起真实网络请求。
-class _FakeAuthService extends AuthService {
-  _FakeAuthService()
-      : super(
-          apiClient: ApiClient(baseUrl: 'https://test.local'),
-          tokenStore: InMemoryTokenStore(),
-        );
-
-  @override
-  Future<LoginResult> login({
-    required String username,
-    required String password,
-  }) async {
-    return LoginResult(
-      token: 'test-token',
-      user: UserInfo(id: 1, username: username, nickname: '', phone: ''),
-    );
-  }
-
-  @override
-  Future<void> register({
-    required String username,
-    required String password,
-    String? nickname,
-    String? phone,
-  }) async {}
-
-  @override
-  Future<void> logout() async {}
-
-  @override
-  Future<UserInfo> fetchCurrentUser() async {
-    return const UserInfo(id: 1, username: 'tester', nickname: '', phone: '');
-  }
-}
-
-/// 测试用的推荐服务，封装原有的 mock 数据。
-class _TestRecommendService extends HomeRecommendService {
-  final HomeRecommendMockService _mockService;
-
-  _TestRecommendService({required super.apiClient})
-      : _mockService = const HomeRecommendMockService();
-
-  @override
-  Future<HomeRecommendPageResult> fetchRecommendProducts({
-    required int page,
-  }) async {
-    return _mockService.fetchRecommendProducts(page: page);
-  }
+/// 创建已打桩的推荐服务：按页返回生产 mock 数据。
+MockHomeRecommendService _buildRecommendService() {
+  final MockHomeRecommendService service = MockHomeRecommendService();
+  stubRecommendFromMockData(service);
+  return service;
 }
 
 Widget _buildTestMyApp() {
+  final MockAuthService authService = MockAuthService();
+  final MockTokenStore tokenStore = MockTokenStore();
+  // 本地无 token，restoreSession 后进入未登录访客态，
+  // 登录态不依赖平台通道，避免 SharedPreferences 卡住测试。
+  when(tokenStore.readToken()).thenAnswer((_) async => null);
+
   return MyApp(
-    recommendService: _TestRecommendService(
-      apiClient: ApiClient(baseUrl: 'https://test.local'),
-    ),
-    // 测试环境注入不依赖平台通道的登录态，避免 SharedPreferences 卡住测试。
+    recommendService: _buildRecommendService(),
     authNotifier: AuthNotifier(
-      authService: _FakeAuthService(),
-      tokenStore: InMemoryTokenStore(),
+      authService: authService,
+      tokenStore: tokenStore,
     )..restoreSession(),
   );
 }

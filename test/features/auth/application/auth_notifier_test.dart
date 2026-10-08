@@ -1,68 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mockito/mockito.dart';
 
-import 'package:my_first_app/core/api/api_client.dart';
 import 'package:my_first_app/core/api/api_exception.dart';
 import 'package:my_first_app/features/auth/application/auth_notifier.dart';
-import 'package:my_first_app/features/auth/data/auth_service.dart';
 import 'package:my_first_app/features/auth/data/models/user_info.dart';
-import 'package:my_first_app/features/auth/data/token_store.dart';
-
-/// 可配置行为的登录服务假实现。
-///
-/// 通过 [loginResult] 控制登录成功还是抛出业务异常，
-/// 其余方法只记录调用，不发起真实网络请求。
-class _StubAuthService extends AuthService {
-  final Object? loginResult;
-
-  /// fetchCurrentUser 的返回值，传异常对象可模拟“本地 token 已失效”。
-  final Object? currentUserResult;
-  int logoutCallCount = 0;
-  int fetchCurrentUserCallCount = 0;
-
-  _StubAuthService({this.loginResult, this.currentUserResult})
-      : super(
-          apiClient: ApiClient(baseUrl: 'https://test.local'),
-          tokenStore: InMemoryTokenStore(),
-        );
-
-  @override
-  Future<LoginResult> login({
-    required String username,
-    required String password,
-  }) async {
-    final Object? result = loginResult;
-    if (result is LoginResult) {
-      return result;
-    }
-    throw result ?? const ApiException(message: '登录失败');
-  }
-
-  @override
-  Future<void> register({
-    required String username,
-    required String password,
-    String? nickname,
-    String? phone,
-  }) async {}
-
-  @override
-  Future<void> logout() async {
-    logoutCallCount++;
-  }
-
-  @override
-  Future<UserInfo> fetchCurrentUser() async {
-    fetchCurrentUserCallCount++;
-    final Object? result = currentUserResult;
-    if (result is UserInfo) {
-      return result;
-    }
-    if (result != null) {
-      throw result;
-    }
-    return const UserInfo(id: 1, username: 'tester', nickname: '', phone: '');
-  }
-}
+import '../../../helpers/mocks.mocks.dart';
 
 const LoginResult _successResult = LoginResult(
   token: 'jwt-token',
@@ -70,42 +12,52 @@ const LoginResult _successResult = LoginResult(
 );
 
 void main() {
+  late MockAuthService authService;
+  late MockTokenStore tokenStore;
+
+  setUp(() {
+    authService = MockAuthService();
+    tokenStore = MockTokenStore();
+    // 默认按“本地无 token”处理，restoreSession 不会触碰网络。
+    when(tokenStore.readToken()).thenAnswer((_) async => null);
+  });
+
   group('AuthNotifier.restoreSession', () {
     test('本地没有 token 时直接进入未登录态，不发起请求', () async {
-      final _StubAuthService service = _StubAuthService();
       final AuthNotifier notifier = AuthNotifier(
-        authService: service,
-        tokenStore: InMemoryTokenStore(),
+        authService: authService,
+        tokenStore: tokenStore,
       );
 
       await notifier.restoreSession();
 
       expect(notifier.status, AuthStatus.unauthenticated);
-      expect(service.fetchCurrentUserCallCount, 0);
+      verifyNever(authService.fetchCurrentUser());
     });
 
     test('本地 token 有效时恢复登录态', () async {
-      final _StubAuthService service = _StubAuthService();
+      when(tokenStore.readToken()).thenAnswer((_) async => 'saved-jwt');
+      when(authService.fetchCurrentUser()).thenAnswer(
+        (_) async => const UserInfo(id: 1, username: 'tester', nickname: '', phone: ''),
+      );
       final AuthNotifier notifier = AuthNotifier(
-        authService: service,
-        tokenStore: InMemoryTokenStore(token: 'saved-jwt'),
+        authService: authService,
+        tokenStore: tokenStore,
       );
 
       await notifier.restoreSession();
 
       expect(notifier.status, AuthStatus.authenticated);
       expect(notifier.user?.username, 'tester');
-      expect(service.fetchCurrentUserCallCount, 1);
+      verify(authService.fetchCurrentUser()).called(1);
     });
 
     test('本地 token 已失效时清除凭证回到未登录态', () async {
-      final _StubAuthService service = _StubAuthService(
-        currentUserResult: const ApiException(message: 'token 已失效'),
-      );
-      final InMemoryTokenStore tokenStore =
-          InMemoryTokenStore(token: 'expired-jwt');
+      when(tokenStore.readToken()).thenAnswer((_) async => 'expired-jwt');
+      when(authService.fetchCurrentUser())
+          .thenThrow(const ApiException(message: 'token 已失效'));
       final AuthNotifier notifier = AuthNotifier(
-        authService: service,
+        authService: authService,
         tokenStore: tokenStore,
       );
 
@@ -113,15 +65,19 @@ void main() {
 
       expect(notifier.status, AuthStatus.unauthenticated);
       expect(notifier.user, isNull);
-      expect(tokenStore.token, isNull);
+      verify(tokenStore.clearToken()).called(1);
     });
   });
 
   group('AuthNotifier.login', () {
     test('登录成功进入已登录态', () async {
+      when(authService.login(
+        username: anyNamed('username'),
+        password: anyNamed('password'),
+      )).thenAnswer((_) async => _successResult);
       final AuthNotifier notifier = AuthNotifier(
-        authService: _StubAuthService(loginResult: _successResult),
-        tokenStore: InMemoryTokenStore(),
+        authService: authService,
+        tokenStore: tokenStore,
       );
       await notifier.restoreSession();
 
@@ -136,11 +92,13 @@ void main() {
     });
 
     test('登录失败回到未登录态并记录错误信息', () async {
+      when(authService.login(
+        username: anyNamed('username'),
+        password: anyNamed('password'),
+      )).thenThrow(const ApiException(message: '用户名或密码错误'));
       final AuthNotifier notifier = AuthNotifier(
-        authService: _StubAuthService(
-          loginResult: const ApiException(message: '用户名或密码错误'),
-        ),
-        tokenStore: InMemoryTokenStore(),
+        authService: authService,
+        tokenStore: tokenStore,
       );
       await notifier.restoreSession();
 
@@ -157,11 +115,12 @@ void main() {
 
   group('AuthNotifier.logout', () {
     test('退出登录会清空用户并通知后端', () async {
-      final _StubAuthService service =
-          _StubAuthService(loginResult: _successResult);
-      final InMemoryTokenStore tokenStore = InMemoryTokenStore();
+      when(authService.login(
+        username: anyNamed('username'),
+        password: anyNamed('password'),
+      )).thenAnswer((_) async => _successResult);
       final AuthNotifier notifier = AuthNotifier(
-        authService: service,
+        authService: authService,
         tokenStore: tokenStore,
       );
       await notifier.restoreSession();
@@ -171,16 +130,26 @@ void main() {
 
       expect(notifier.isAuthenticated, isFalse);
       expect(notifier.user, isNull);
-      expect(tokenStore.token, isNull);
-      expect(service.logoutCallCount, 1);
+      verify(tokenStore.clearToken()).called(1);
+      verify(authService.logout()).called(1);
     });
   });
 
   group('AuthNotifier.register', () {
     test('注册成功后自动登录', () async {
+      when(authService.register(
+        username: anyNamed('username'),
+        password: anyNamed('password'),
+        nickname: anyNamed('nickname'),
+        phone: anyNamed('phone'),
+      )).thenAnswer((_) async {});
+      when(authService.login(
+        username: anyNamed('username'),
+        password: anyNamed('password'),
+      )).thenAnswer((_) async => _successResult);
       final AuthNotifier notifier = AuthNotifier(
-        authService: _StubAuthService(loginResult: _successResult),
-        tokenStore: InMemoryTokenStore(),
+        authService: authService,
+        tokenStore: tokenStore,
       );
       await notifier.restoreSession();
 
@@ -194,14 +163,22 @@ void main() {
     });
 
     test('注册成功但自动登录失败时回到未登录并提示错误', () async {
+      when(authService.register(
+        username: anyNamed('username'),
+        password: anyNamed('password'),
+        nickname: anyNamed('nickname'),
+        phone: anyNamed('phone'),
+      )).thenAnswer((_) async {});
+      when(authService.login(
+        username: anyNamed('username'),
+        password: anyNamed('password'),
+      )).thenThrow(const ApiException(message: '用户名或密码错误'));
       final AuthNotifier notifier = AuthNotifier(
-        authService: _StubAuthService(
-          loginResult: const ApiException(message: '用户名或密码错误'),
-        ),
-        tokenStore: InMemoryTokenStore(),
+        authService: authService,
+        tokenStore: tokenStore,
       );
 
-      // register 在假实现里总是成功，随后自动走 login，
+      // register 打桩为总是成功，随后自动走 login，
       // 而 login 被配置为抛出业务异常，用来验证失败路径的状态兜底。
       final bool didSucceed = await notifier.register(
         username: 'alice',

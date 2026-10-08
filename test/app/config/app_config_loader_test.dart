@@ -3,12 +3,13 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mockito/mockito.dart';
 import 'package:my_first_app/app/config/app_config.dart';
 import 'package:my_first_app/app/config/app_config_loader.dart';
 import 'package:my_first_app/app/config/app_config_store.dart';
 import 'package:my_first_app/app/config/app_environment.dart';
 import 'package:my_first_app/bootstrap.dart';
-import 'package:my_first_app/features/payment/application/payment_sdk_initializer.dart';
+import '../../helpers/mocks.mocks.dart';
 
 void main() {
   group('AppEnvironment', () {
@@ -92,8 +93,7 @@ void main() {
 
     testWidgets('启动前会预留支付 SDK 初始化入口', (WidgetTester tester) async {
       AppConfigStore.resetForTest();
-      final _RecordingPaymentSdkInitializer initializer =
-          _RecordingPaymentSdkInitializer();
+      final MockPaymentSdkInitializer initializer = MockPaymentSdkInitializer();
 
       await bootstrap(
         const SizedBox(key: ValueKey<String>('bootstrapped-app-with-payment')),
@@ -115,9 +115,11 @@ void main() {
       );
       await tester.pump();
 
-      expect(initializer.receivedConfig, isNotNull);
-      expect(initializer.receivedConfig?.environment, AppEnvironment.dev);
-      expect(initializer.receivedConfig?.wechatAppId, 'dev-wechat-app-id');
+      // 初始化器应收到 bootstrap 透传的环境配置。
+      final AppConfig receivedConfig =
+          verify(initializer.initialize(captureAny)).captured.single as AppConfig;
+      expect(receivedConfig.environment, AppEnvironment.dev);
+      expect(receivedConfig.wechatAppId, 'dev-wechat-app-id');
       expect(find.byKey(const ValueKey<String>('bootstrapped-app-with-payment')), findsOneWidget);
     });
   });
@@ -138,14 +140,5 @@ class FakeAssetBundle extends CachingAssetBundle {
 
     final Uint8List bytes = Uint8List.fromList(utf8.encode(content));
     return ByteData.sublistView(bytes);
-  }
-}
-
-class _RecordingPaymentSdkInitializer implements PaymentSdkInitializer {
-  AppConfig? receivedConfig;
-
-  @override
-  Future<void> initialize(AppConfig config) async {
-    receivedConfig = config;
   }
 }

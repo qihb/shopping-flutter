@@ -42,6 +42,22 @@ dev_dependencies:
   # 在根目录的 `analysis_options.yaml` 中启用。
   flutter_lints: ^6.0.0
 
+  # `mockito` 是 Dart 社区标准的 Mock 框架，配合 `build_runner` 代码生成，
+  # 用 `@GenerateNiceMocks` 声明一次即可为接口/服务类生成 Mock 替身，
+  # 取代之前手写的 Fake/Stub（见 `test/helpers/mocks.dart`）。
+  mockito: ^5.7.0
+  # `build_runner` 是 Dart 官方代码生成器，负责运行 mockito 的 Mock 生成。
+  # 生成命令：`dart run build_runner build --delete-conflicting-outputs`
+  build_runner: ^2.15.1
+  # `patrol` 是 Flutter 原生自动化集成测试框架，基于 integration_test 扩展，
+  # 能操作系统权限弹窗、通知等原生 UI，弥补纯 Dart 层集成测试的盲区。
+  # 运行 E2E 需要 `patrol_cli`：`flutter pub global activate patrol_cli`
+  patrol: ^4.10.0
+  # `integration_test` 是 Flutter 官方集成测试框架，E2E 用例运行在真机/模拟器上。
+  # 必须以 SDK 依赖方式声明（pub add 会误解析成 pub.dev 同名旧包）。
+  integration_test:
+    sdk: flutter
+
 flutter:
 
   # 启用 Material Icons，项目里可直接使用 Material 图标。
@@ -62,3 +78,15 @@ fluwx:
   app_id: wx1234567890abcdef
   universal_link: https://example.com/wechat/link/
   scene_delegate: true
+
+patrol:
+  # Patrol 的应用级配置：E2E 用例所在目录与两端应用标识，
+  # `patrol drive` / `patrol test` 会根据这些信息构建并安装应用。
+  app_name: my_first_app
+  test_directory: integration_test
+  android:
+    # 对应 android/app/build.gradle.kts 中的 applicationId。
+    package_name: com.example.my_first_app
+  ios:
+    # 对应 ios/Runner.xcodeproj 中的 PRODUCT_BUNDLE_IDENTIFIER。
+    bundle_id: com.example.myFirstApp

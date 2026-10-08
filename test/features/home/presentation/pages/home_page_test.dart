@@ -1,34 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:my_first_app/core/api/api_client.dart';
-import 'package:my_first_app/features/home/data/home_recommend_mock_service.dart';
-import 'package:my_first_app/features/home/data/home_recommend_service.dart';
-import 'package:my_first_app/features/home/presentation/models/home_recommend_product.dart';
 import 'package:my_first_app/features/home/presentation/pages/home_page.dart';
+import '../../../../helpers/mocks.mocks.dart';
+import '../../../../helpers/stub_helpers.dart';
 
-/// 测试用的推荐服务，封装原有的 mock 数据。
-class _TestRecommendService extends HomeRecommendService {
-  final HomeRecommendMockService _mockService;
-
-  _TestRecommendService({required super.apiClient})
-      : _mockService = const HomeRecommendMockService();
-
-  @override
-  Future<HomeRecommendPageResult> fetchRecommendProducts({
-    required int page,
-  }) async {
-    return _mockService.fetchRecommendProducts(page: page);
-  }
+/// 创建已打桩的推荐服务：按页返回生产 mock 数据。
+MockHomeRecommendService _buildRecommendService() {
+  final MockHomeRecommendService service = MockHomeRecommendService();
+  stubRecommendFromMockData(service);
+  return service;
 }
 
 Widget _buildTestHome() {
   return MaterialApp(
     home: Scaffold(
       body: HomePage(
-        recommendService: _TestRecommendService(
-          apiClient: ApiClient(baseUrl: 'https://test.local'),
-        ),
+        recommendService: _buildRecommendService(),
       ),
     ),
   );

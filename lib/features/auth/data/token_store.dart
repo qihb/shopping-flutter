@@ -77,29 +77,3 @@ class SharedPrefsTokenStore implements TokenStore {
     return buffer.toString().substring(0, 32);
   }
 }
-
-/// 内存版实现，仅用于测试。
-class InMemoryTokenStore implements TokenStore {
-  String? token;
-  String? clientId;
-
-  InMemoryTokenStore({this.token, this.clientId});
-
-  @override
-  Future<String?> readToken() async => token;
-
-  @override
-  Future<void> saveToken(String token) async {
-    this.token = token;
-  }
-
-  @override
-  Future<void> clearToken() async {
-    token = null;
-  }
-
-  @override
-  Future<String> readOrCreateClientId() async {
-    return clientId ??= 'test-client-id';
-  }
-}

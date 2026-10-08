@@ -1,17 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mockito/mockito.dart';
 import 'package:provider/provider.dart';
 
 import 'package:my_first_app/app/presentation/pages/main_tab_page.dart';
-import 'package:my_first_app/core/api/api_client.dart';
 import 'package:my_first_app/features/auth/application/auth_notifier.dart';
-import 'package:my_first_app/features/auth/data/auth_service.dart';
-import 'package:my_first_app/features/auth/data/models/user_info.dart';
-import 'package:my_first_app/features/auth/data/token_store.dart';
 import 'package:my_first_app/features/cart/application/cart_notifier.dart';
-import 'package:my_first_app/features/home/data/home_recommend_mock_service.dart';
-import 'package:my_first_app/features/home/data/home_recommend_service.dart';
-import 'package:my_first_app/features/home/presentation/models/home_recommend_product.dart';
 import 'package:my_first_app/features/order/application/order_notifier.dart';
 import 'package:my_first_app/features/payment/application/payment_gateway.dart';
 import 'package:my_first_app/features/payment/application/payment_service.dart';
@@ -21,85 +15,84 @@ import 'package:my_first_app/features/payment/presentation/models/payment_result
 import 'package:my_first_app/features/profile/application/address_notifier.dart';
 import 'package:my_first_app/features/profile/application/settings_notifier.dart';
 import 'package:my_first_app/features/profile/presentation/models/user_address.dart';
+import '../../../helpers/mocks.mocks.dart';
+import '../../../helpers/stub_helpers.dart';
 
-/// 测试用的登录服务，不发起真实网络请求。
-///
-/// 测试里统一按“未登录”处理，不触发任何登录态变化。
-class _FakeAuthService extends AuthService {
-  _FakeAuthService()
-      : super(
-          apiClient: ApiClient(baseUrl: 'https://test.local'),
-          tokenStore: InMemoryTokenStore(),
-        );
-
-  @override
-  Future<LoginResult> login({
-    required String username,
-    required String password,
-  }) async {
-    return LoginResult(
-      token: 'test-token',
-      user: UserInfo(id: 1, username: username, nickname: '', phone: ''),
-    );
-  }
-
-  @override
-  Future<void> register({
-    required String username,
-    required String password,
-    String? nickname,
-    String? phone,
-  }) async {}
-
-  @override
-  Future<void> logout() async {}
-
-  @override
-  Future<UserInfo> fetchCurrentUser() async {
-    return const UserInfo(id: 1, username: 'tester', nickname: '', phone: '');
-  }
+/// 创建默认未登录的登录态管理：token 存取走 Mock，restoreSession 后处于未登录态。
+AuthNotifier _buildAuthNotifier() {
+  final MockAuthService authService = MockAuthService();
+  final MockTokenStore tokenStore = MockTokenStore();
+  when(tokenStore.readToken()).thenAnswer((_) async => null);
+  return AuthNotifier(
+    authService: authService,
+    tokenStore: tokenStore,
+  )..restoreSession();
 }
 
-/// 测试用的推荐服务，封装原有的 mock 数据。
-///
-/// 它把原来的 `HomeRecommendMockService` 适配成 `HomeRecommendService` 的接口，
-/// 让测试不依赖真实网络请求。
-class _TestRecommendService extends HomeRecommendService {
-  final HomeRecommendMockService _mockService;
+/// 创建已打桩的推荐服务：按页返回 [HomeRecommendMockService] 的固定数据。
+MockHomeRecommendService _buildRecommendService() {
+  final MockHomeRecommendService service = MockHomeRecommendService();
+  stubRecommendFromMockData(service);
+  return service;
+}
 
-  _TestRecommendService({required super.apiClient})
-      : _mockService = const HomeRecommendMockService();
+/// 创建默认支付成功的网关（用于不需要自定义支付结果的测试）。
+MockPaymentGateway _buildSuccessGateway() {
+  final MockPaymentGateway gateway = MockPaymentGateway();
+  when(gateway.pay(any)).thenAnswer(
+    (_) async => const PaymentResult(
+      method: PaymentMethod.alipay,
+      status: PaymentStatus.success,
+      message: '支付成功',
+    ),
+  );
+  return gateway;
+}
 
-  @override
-  Future<HomeRecommendPageResult> fetchRecommendProducts({
-    required int page,
-  }) async {
-    return _mockService.fetchRecommendProducts(page: page);
-  }
+/// 创建返回固定结果的网关（用于验证支付参数或失败提示）。
+MockPaymentGateway _buildGatewayWithResult(PaymentResult result) {
+  final MockPaymentGateway gateway = MockPaymentGateway();
+  when(gateway.pay(any)).thenAnswer((_) async => result);
+  return gateway;
+}
+
+/// 创建按队列依次返回结果的网关（用于模拟失败后重试等序列场景）。
+MockPaymentGateway _buildSequencedGateway(List<PaymentResult> results) {
+  final MockPaymentGateway gateway = MockPaymentGateway();
+  final List<PaymentResult> queue = List<PaymentResult>.of(results);
+  when(gateway.pay(any)).thenAnswer((_) async {
+    if (queue.isEmpty) {
+      throw StateError('没有可用的支付结果可供测试消费');
+    }
+    return queue.removeAt(0);
+  });
+  return gateway;
+}
+
+/// 提取网关收到过的支付请求（单次调用场景）。
+PaymentRequest _capturedPayRequest(MockPaymentGateway gateway) {
+  return verify(gateway.pay(captureAny)).captured.single as PaymentRequest;
 }
 
 /// 创建一个用于测试的 MainTabPage Provider 包装。
 ///
-/// 现在 `MainTabPage` 不再直接接收 `paymentService`，
-/// 而是通过 Provider 树间接获取状态。测试时需要把各个 Notifier 注入进去。
+/// `MainTabPage` 通过 Provider 树间接获取状态，
+/// 测试时需要把各个 Notifier 注入进去。
 Widget _buildTestApp({
   PaymentService? paymentService,
 }) {
   final PaymentService service = paymentService ??
       PaymentService(
         gateways: <PaymentMethod, PaymentGateway>{
-          PaymentMethod.alipay: _SuccessPaymentGateway(),
-          PaymentMethod.wechatPay: _SuccessPaymentGateway(),
+          PaymentMethod.alipay: _buildSuccessGateway(),
+          PaymentMethod.wechatPay: _buildSuccessGateway(),
         },
       );
 
   return MultiProvider(
     providers: [
       ChangeNotifierProvider<AuthNotifier>(
-        create: (_) => AuthNotifier(
-          authService: _FakeAuthService(),
-          tokenStore: InMemoryTokenStore(),
-        )..restoreSession(),
+        create: (_) => _buildAuthNotifier(),
       ),
       ChangeNotifierProvider<CartNotifier>(create: (_) => CartNotifier()),
       ChangeNotifierProvider<OrderNotifier>(
@@ -128,60 +121,10 @@ Widget _buildTestApp({
     ],
     child: MaterialApp(
       home: MainTabPage(
-        recommendService: _TestRecommendService(
-          // 测试用 ApiClient，不会被真正调用
-          apiClient: ApiClient(baseUrl: 'https://test.local'),
-        ),
+        recommendService: _buildRecommendService(),
       ),
     ),
   );
-}
-
-/// 默认成功的支付网关（用于不需要自定义支付结果的测试）。
-class _SuccessPaymentGateway implements PaymentGateway {
-  const _SuccessPaymentGateway();
-
-  @override
-  Future<PaymentResult> pay(PaymentRequest request) async {
-    return const PaymentResult(
-      method: PaymentMethod.alipay,
-      status: PaymentStatus.success,
-      message: '支付成功',
-    );
-  }
-}
-
-/// 记录最后一次请求的支付网关（用于验证支付参数）。
-class _RecordingPaymentGateway implements PaymentGateway {
-  PaymentRequest? lastRequest;
-  final PaymentResult result;
-
-  _RecordingPaymentGateway({required this.result});
-
-  @override
-  Future<PaymentResult> pay(PaymentRequest request) async {
-    lastRequest = request;
-    return result;
-  }
-}
-
-/// 按顺序返回多个结果的支付网关（用于模拟失败+重试）。
-class _SequencedPaymentGateway implements PaymentGateway {
-  final List<PaymentResult> results;
-  final List<PaymentRequest> requests = <PaymentRequest>[];
-
-  _SequencedPaymentGateway({required this.results});
-
-  @override
-  Future<PaymentResult> pay(PaymentRequest request) async {
-    requests.add(request);
-
-    if (results.isEmpty) {
-      throw StateError('没有可用的支付结果可供测试消费');
-    }
-
-    return results.removeAt(0);
-  }
 }
 
 Future<void> _addProductToCart(
@@ -299,15 +242,15 @@ void main() {
   });
 
   testWidgets('从购物车进入订单确认页后支付成功并在我的页面显示订单', (WidgetTester tester) async {
-    final _RecordingPaymentGateway wechatGateway = _RecordingPaymentGateway(
-      result: const PaymentResult(
+    final MockPaymentGateway wechatGateway = _buildGatewayWithResult(
+      const PaymentResult(
         method: PaymentMethod.wechatPay,
         status: PaymentStatus.success,
         message: '微信支付成功',
       ),
     );
-    final _RecordingPaymentGateway alipayGateway = _RecordingPaymentGateway(
-      result: const PaymentResult(
+    final MockPaymentGateway alipayGateway = _buildGatewayWithResult(
+      const PaymentResult(
         method: PaymentMethod.alipay,
         status: PaymentStatus.success,
         message: '支付宝支付成功',
@@ -332,14 +275,17 @@ void main() {
     expect(find.text('订单状态'), findsWidgets);
     expect(find.text('待发货'), findsWidgets);
     expect(find.text('夏季轻运动鞋'), findsOneWidget);
-    expect(wechatGateway.lastRequest?.method, PaymentMethod.wechatPay);
-    expect(wechatGateway.lastRequest?.orderId, 'ORD-0000001');
-    expect(alipayGateway.lastRequest, isNull);
+
+    // 校验微信网关收到的支付请求，且支付宝网关未被调用。
+    final PaymentRequest wechatRequest = _capturedPayRequest(wechatGateway);
+    expect(wechatRequest.method, PaymentMethod.wechatPay);
+    expect(wechatRequest.orderId, 'ORD-0000001');
+    verifyNever(alipayGateway.pay(any));
   });
 
   testWidgets('支付失败后会保留待付款订单并展示失败提示', (WidgetTester tester) async {
-    final _RecordingPaymentGateway alipayGateway = _RecordingPaymentGateway(
-      result: const PaymentResult(
+    final MockPaymentGateway alipayGateway = _buildGatewayWithResult(
+      const PaymentResult(
         method: PaymentMethod.alipay,
         status: PaymentStatus.failure,
         message: '支付宝支付失败',
@@ -363,13 +309,15 @@ void main() {
     expect(find.text('最近订单'), findsOneWidget);
     expect(find.text('订单状态'), findsWidgets);
     expect(find.text('待付款'), findsWidgets);
-    expect(alipayGateway.lastRequest?.method, PaymentMethod.alipay);
-    expect(alipayGateway.lastRequest?.orderId, 'ORD-0000001');
+
+    final PaymentRequest alipayRequest = _capturedPayRequest(alipayGateway);
+    expect(alipayRequest.method, PaymentMethod.alipay);
+    expect(alipayRequest.orderId, 'ORD-0000001');
   });
 
   testWidgets('待付款订单可以继续支付并更新为待发货', (WidgetTester tester) async {
-    final _SequencedPaymentGateway alipayGateway = _SequencedPaymentGateway(
-      results: <PaymentResult>[
+    final MockPaymentGateway alipayGateway = _buildSequencedGateway(
+      <PaymentResult>[
         const PaymentResult(
           method: PaymentMethod.alipay,
           status: PaymentStatus.failure,
@@ -377,8 +325,8 @@ void main() {
         ),
       ],
     );
-    final _SequencedPaymentGateway wechatGateway = _SequencedPaymentGateway(
-      results: <PaymentResult>[
+    final MockPaymentGateway wechatGateway = _buildSequencedGateway(
+      <PaymentResult>[
         const PaymentResult(
           method: PaymentMethod.wechatPay,
           status: PaymentStatus.success,
@@ -425,9 +373,13 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.text('待发货'), findsWidgets);
-    expect(alipayGateway.requests.single.orderId, 'ORD-0000001');
-    expect(wechatGateway.requests.single.orderId, 'ORD-0000001');
-    expect(wechatGateway.requests.single.method, PaymentMethod.wechatPay);
+
+    // 首次支付宝失败和补付微信成功各自收到一笔请求。
+    final PaymentRequest alipayRequest = _capturedPayRequest(alipayGateway);
+    expect(alipayRequest.orderId, 'ORD-0000001');
+    final PaymentRequest wechatRequest = _capturedPayRequest(wechatGateway);
+    expect(wechatRequest.orderId, 'ORD-0000001');
+    expect(wechatRequest.method, PaymentMethod.wechatPay);
   });
 
   testWidgets('购物车提交订单前会先进入订单确认页并展示地址栏', (WidgetTester tester) async {
