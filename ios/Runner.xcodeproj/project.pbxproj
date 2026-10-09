@@ -261,6 +261,7 @@
 				97C146EC1CF9000F007C117D /* Resources */,
 				9705A1C41CF9048500538489 /* Embed Frameworks */,
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
+				7B2E9F4C1D8A5E306C4F21A9 /* Embed Testing shims */,
 				B253FF9BF74117046B5F4DCE /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
@@ -280,11 +281,9 @@
 			buildConfigurationList = 9C6F93DAFFC918A7E3EF1837 /* Build configuration list for PBXNativeTarget "RunnerUITests" */;
 			buildPhases = (
 				A5D2D39748F57E738CDEE6EE /* [CP] Check Pods Manifest.lock */,
-				02448349D278BF881B239EFF /* xcode_backend build */,
 				9460F9AF39363BE964715523 /* Sources */,
 				894BFC9EA7D624E55CAEC300 /* Frameworks */,
 				D8A3A1937093148F4F5115D9 /* Resources */,
-				E94C47FDA3FA650D875C68F2 /* xcode_backend embed_and_thin */,
 				A5CD988D01A7F7DEE2AF526E /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
@@ -377,6 +376,22 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		7B2E9F4C1D8A5E306C4F21A9 /* Embed Testing shims */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Embed Testing shims";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Xcode 26 模拟器：libXCTestSwiftSupport.dylib 依赖的 _Testing_*.framework\n# 位于 Developer/Library/Frameworks，模拟器运行时不自带；测试会话通过\n# xctestrun 注入的 DYLD_FRAMEWORK_PATH 在 iOS 26.5 上未生效，导致 App\n# 启动即 dyld 崩溃、Patrol 服务无法就绪。Debug 构建时补嵌进 App 包；\n# Testing.framework 自身还依赖 Developer/usr/lib/lib_TestingInterop.dylib。\nif [ \"${CONFIGURATION}\" = \"Debug\" ]; then\n  SRC=\"${PLATFORM_DIR}/Developer/Library/Frameworks\"\n  DST=\"${BUILT_PRODUCTS_DIR}/${WRAPPER_NAME}/Frameworks\"\n  for FW in _Testing_CoreGraphics _Testing_CoreImage _Testing_Foundation _Testing_UIKit; do\n    if [ -d \"${SRC}/${FW}.framework\" ] && [ ! -d \"${DST}/${FW}.framework\" ]; then\n      ditto \"${SRC}/${FW}.framework\" \"${DST}/${FW}.framework\"\n    fi\n  done\n  INTEROP=\"${PLATFORM_DIR}/Developer/usr/lib/lib_TestingInterop.dylib\"\n  if [ -f \"${INTEROP}\" ] && [ ! -f \"${DST}/lib_TestingInterop.dylib\" ]; then\n    ditto \"${INTEROP}\" \"${DST}/lib_TestingInterop.dylib\"\n  fi\nfi";
+			showEnvVarsInLog = 0;
+		};
 		02448349D278BF881B239EFF /* xcode_backend build */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -750,6 +765,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.myFirstApp.RunnerUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.0;
 				TEST_TARGET_NAME = Runner;
@@ -769,6 +785,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.myFirstApp.RunnerUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.0;
 				TEST_TARGET_NAME = Runner;
@@ -946,6 +963,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.myFirstApp.RunnerUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.0;
 				TEST_TARGET_NAME = Runner;
