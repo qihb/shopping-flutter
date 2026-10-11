@@ -1,62 +1,43 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import 'package:my_first_app/features/order/presentation/models/order_record.dart';
+import 'package:my_first_app/features/order/application/order_notifier.dart';
+import 'package:my_first_app/features/order/data/models/order_vo.dart';
 
 /// 订单详情页。
 ///
 /// 它和订单记录页的区别是：
 /// - 订单记录页更像“某个状态下的订单列表”
 /// - 订单详情页更像“查看某一笔订单的完整信息”
-class OrderDetailPage extends StatefulWidget {
-  final OrderRecord order;
-  final ValueChanged<OrderRecord>? onAdvanceOrderStatus;
-  final Future<bool> Function(OrderRecord order)? onRepayOrder;
+///
+/// 页面实时 watch [OrderNotifier]：动作触发服务端变更并刷新列表后，
+/// 这里按 [OrderVO.orderNo] 重新定位最新订单数据，详情自动更新，
+/// 不需要本地再维护一份可变状态。
+class OrderDetailPage extends StatelessWidget {
+  /// 打开详情时的订单快照，用于按订单号定位最新数据。
+  final OrderVO order;
+  final Future<bool> Function(OrderVO order)? onRepayOrder;
+  final Future<bool> Function(OrderVO order)? onConfirmOrder;
+  final Future<bool> Function(OrderVO order)? onCancelOrder;
 
   const OrderDetailPage({
     super.key,
     required this.order,
-    this.onAdvanceOrderStatus,
     this.onRepayOrder,
+    this.onConfirmOrder,
+    this.onCancelOrder,
   });
 
   @override
-  State<OrderDetailPage> createState() => _OrderDetailPageState();
-}
-
-class _OrderDetailPageState extends State<OrderDetailPage> {
-  late OrderRecord _order;
-
-  @override
-  void initState() {
-    super.initState();
-    _order = widget.order;
-  }
-
-  void _handleAdvanceOrderStatus() {
-    if (!_order.canAdvanceStatus) {
-      return;
-    }
-
-    widget.onAdvanceOrderStatus?.call(_order);
-    setState(() {
-      _order = _order.advanceStatus();
-    });
-  }
-
-  Future<void> _handleRepayOrder() async {
-    final bool didSucceed = await widget.onRepayOrder?.call(_order) ?? false;
-
-    if (!didSucceed) {
-      return;
-    }
-
-    setState(() {
-      _order = _order.advanceStatus();
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final OrderNotifier orderNotifier = context.watch<OrderNotifier>();
+
+    // 列表刷新后按订单号取最新快照；订单被并发删除等极端情况下回退到入口快照。
+    final OrderVO currentOrder = orderNotifier.orders.firstWhere(
+      (candidate) => candidate.orderNo == order.orderNo,
+      orElse: () => order,
+    );
+
     return Scaffold(
       appBar: AppBar(title: const Text('订单详情')),
       body: ListView(
@@ -72,20 +53,28 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '订单编号 ${_order.id}',
+                  '订单编号 ${currentOrder.orderNo}',
                   style: Theme.of(
                     context,
                   ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 12),
-                Text('状态 ${_order.statusLabel}'),
+                Text('状态 ${currentOrder.statusLabel}'),
                 const SizedBox(height: 8),
-                Text('合计 ${_order.totalPriceLabel}'),
+                Text('合计 ${currentOrder.payAmountLabel}'),
                 const SizedBox(height: 8),
-                Text('地址 ${_order.shippingAddressLabel}'),
-                if (_order.canAdvanceStatus) ...[
-                  const SizedBox(height: 12),
-                  Text('下一步: ${_order.nextStatusLabel}'),
+                Text('地址 ${currentOrder.receiverAddress}'),
+                const SizedBox(height: 8),
+                Text(
+                  '收货人 ${currentOrder.receiverName} ${currentOrder.receiverPhone}',
+                ),
+                if (currentOrder.remark.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text('备注 ${currentOrder.remark}'),
+                ],
+                if (currentOrder.createTime.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text('下单时间 ${currentOrder.createTime}'),
                 ],
               ],
             ),
@@ -93,7 +82,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
           const SizedBox(height: 20),
           Text('商品清单', style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 12),
-          ..._order.items.map(
+          ...currentOrder.items.map(
             (item) => Container(
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(16),
@@ -105,41 +94,48 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    item.name,
+                    item.productName,
                     style: Theme.of(
                       context,
                     ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
                   ),
-                  const SizedBox(height: 6),
+                  if (item.skuSpecs.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text('规格 ${item.skuSpecs}'),
+                  ],
+                  const SizedBox(height: 4),
                   Text('单价 ${item.priceLabel}'),
                   const SizedBox(height: 4),
                   Text('数量 x${item.quantity}'),
                   const SizedBox(height: 4),
-                  Text('小计 ${item.totalPriceLabel}'),
+                  Text('小计 ${item.subtotalLabel}'),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            '这里先把订单详情页做成一个清晰、可阅读的静态信息页，后续很适合继续补地址、支付方式、时间线和售后入口。',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.6),
-          ),
-          if (_order.canAdvanceStatus && widget.onAdvanceOrderStatus != null) ...[
-            const SizedBox(height: 20),
-            FilledButton(
-              key: ValueKey<String>('order-detail-advance-${_order.id}'),
-              onPressed: _handleAdvanceOrderStatus,
-              child: Text('推进到${_order.nextStatusLabel}'),
-            ),
-          ],
-          if (_order.status == OrderStatus.pendingPayment &&
-              widget.onRepayOrder != null) ...[
+          // 动作按服务端状态机开放：待付款可继续支付 / 取消，待收货可确认收货。
+          if (currentOrder.canPay && onRepayOrder != null) ...[
             const SizedBox(height: 12),
             FilledButton(
-              key: ValueKey<String>('order-detail-repay-${_order.id}'),
-              onPressed: _handleRepayOrder,
+              key: ValueKey<String>('order-detail-repay-${currentOrder.orderNo}'),
+              onPressed: () => onRepayOrder!(currentOrder),
               child: const Text('继续支付'),
+            ),
+          ],
+          if (currentOrder.canPay && onCancelOrder != null) ...[
+            const SizedBox(height: 12),
+            FilledButton.tonal(
+              key: ValueKey<String>('order-detail-cancel-${currentOrder.orderNo}'),
+              onPressed: () => onCancelOrder!(currentOrder),
+              child: const Text('取消订单'),
+            ),
+          ],
+          if (currentOrder.canConfirmReceipt && onConfirmOrder != null) ...[
+            const SizedBox(height: 12),
+            FilledButton(
+              key: ValueKey<String>('order-detail-confirm-${currentOrder.orderNo}'),
+              onPressed: () => onConfirmOrder!(currentOrder),
+              child: const Text('确认收货'),
             ),
           ],
         ],

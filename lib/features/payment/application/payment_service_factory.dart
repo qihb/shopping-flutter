@@ -1,34 +1,43 @@
 import 'package:my_first_app/app/config/app_config.dart';
+import 'package:my_first_app/core/api/api_client.dart';
 import 'package:my_first_app/features/payment/application/payment_gateway.dart';
 import 'package:my_first_app/features/payment/application/payment_service.dart';
 import 'package:my_first_app/features/payment/data/gateways/alipay_gateway.dart';
+import 'package:my_first_app/features/payment/data/gateways/remote_pay_gateway.dart';
 import 'package:my_first_app/features/payment/data/gateways/wechat_pay_gateway.dart';
-import 'package:my_first_app/features/payment/data/mock/mock_payment_gateway.dart';
 import 'package:my_first_app/features/payment/data/mock/mock_payment_order_provider.dart';
+import 'package:my_first_app/features/payment/data/pay_service.dart';
 import 'package:my_first_app/features/payment/presentation/models/payment_method.dart';
 
 /// 支付服务工厂。
 ///
-/// `createMock()` 返回纯本地模拟网关，不触碰支付 SDK；
-/// `createReal()` 里支付宝已接入 tobias 调用链路，微信仍为占位实现。
-/// 两者的支付参数当前都来自本地 Mock 提供方（未签名的测试 orderStr），
-/// 接入真实后端后替换 provider 实现即可，网关与上层无需改动。
+/// - `createServerMock()`：支付动作走 spring-shop 的模拟支付网关，
+///   当前后端对接阶段的默认实现；
+/// - `createReal()`：支付宝已接入 tobias 调用链路，微信仍为占位实现，
+///   需要真实商户资质，由 `enableRealPayment` 配置开关启用。
+///   两者的支付参数当前都来自本地 Mock 提供方（未签名的测试 orderStr）。
 class PaymentServiceFactory {
   const PaymentServiceFactory._();
 
-  static PaymentService create(AppConfig config) {
+  static PaymentService create(AppConfig config, {required ApiClient apiClient}) {
     if (config.enableRealPayment) {
       return createReal();
     }
 
-    return createMock();
+    return createServerMock(apiClient: apiClient);
   }
 
-  static PaymentService createMock() {
+  /// 服务端模拟网关：两个渠道共用同一个后端模拟支付实现，
+  /// 渠道差异要等真实商户参数接入后才生效。
+  static PaymentService createServerMock({required ApiClient apiClient}) {
+    final RemotePayGateway gateway = RemotePayGateway(
+      payService: PayService(apiClient: apiClient),
+    );
+
     return PaymentService(
       gateways: <PaymentMethod, PaymentGateway>{
-        PaymentMethod.alipay: const MockPaymentGateway(),
-        PaymentMethod.wechatPay: const MockPaymentGateway(),
+        PaymentMethod.alipay: gateway,
+        PaymentMethod.wechatPay: gateway,
       },
     );
   }

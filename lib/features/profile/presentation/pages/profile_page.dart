@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'package:my_first_app/features/order/presentation/models/order_record.dart';
+import 'package:my_first_app/features/order/data/models/order_status.dart';
+import 'package:my_first_app/features/order/data/models/order_vo.dart';
 import 'package:my_first_app/features/order/presentation/pages/order_record_page.dart';
 import 'package:my_first_app/features/profile/data/models/address_vo.dart';
 import 'package:my_first_app/features/profile/presentation/models/profile_settings.dart';
@@ -16,9 +17,10 @@ class ProfilePage extends StatelessWidget {
   final bool isLoggedIn;
   final List<AddressVO> addresses;
   final ProfileSettings settings;
-  final List<OrderRecord> orders;
-  final ValueChanged<OrderRecord>? onAdvanceOrderStatus;
-  final Future<bool> Function(OrderRecord order)? onRepayOrder;
+  final List<OrderVO> orders;
+  final Future<bool> Function(OrderVO order)? onRepayOrder;
+  final Future<bool> Function(OrderVO order)? onConfirmOrder;
+  final Future<bool> Function(OrderVO order)? onCancelOrder;
   final ValueChanged<bool>? onNotificationChanged;
   final ValueChanged<bool>? onBiometricUnlockChanged;
   final ValueChanged<bool>? onPriceAlertChanged;
@@ -31,9 +33,10 @@ class ProfilePage extends StatelessWidget {
     this.isLoggedIn = true,
     this.addresses = const <AddressVO>[],
     required this.settings,
-    this.orders = const <OrderRecord>[],
-    this.onAdvanceOrderStatus,
+    this.orders = const <OrderVO>[],
     this.onRepayOrder,
+    this.onConfirmOrder,
+    this.onCancelOrder,
     this.onNotificationChanged,
     this.onBiometricUnlockChanged,
     this.onPriceAlertChanged,
@@ -43,7 +46,7 @@ class ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final OrderRecord? latestOrder = orders.isEmpty ? null : orders.first;
+    final OrderVO? latestOrder = orders.isEmpty ? null : orders.first;
 
     return SafeArea(
       child: ListView(
@@ -57,8 +60,9 @@ class ProfilePage extends StatelessWidget {
           const SizedBox(height: 20),
           _OrderStatusOverview(
             orders: orders,
-            onAdvanceOrderStatus: onAdvanceOrderStatus,
             onRepayOrder: onRepayOrder,
+            onConfirmOrder: onConfirmOrder,
+            onCancelOrder: onCancelOrder,
           ),
           const SizedBox(height: 20),
           Text('最近订单', style: Theme.of(context).textTheme.headlineSmall),
@@ -167,24 +171,27 @@ class _ProfileHeaderCard extends StatelessWidget {
 }
 
 class _OrderStatusOverview extends StatelessWidget {
-  final List<OrderRecord> orders;
-  final ValueChanged<OrderRecord>? onAdvanceOrderStatus;
-  final Future<bool> Function(OrderRecord order)? onRepayOrder;
+  final List<OrderVO> orders;
+  final Future<bool> Function(OrderVO order)? onRepayOrder;
+  final Future<bool> Function(OrderVO order)? onConfirmOrder;
+  final Future<bool> Function(OrderVO order)? onCancelOrder;
 
   const _OrderStatusOverview({
     required this.orders,
-    this.onAdvanceOrderStatus,
     this.onRepayOrder,
+    this.onConfirmOrder,
+    this.onCancelOrder,
   });
 
-  void _openOrderRecordPage(BuildContext context, String statusLabel) {
+  void _openOrderRecordPage(BuildContext context, OrderStatus status) {
     // 点击订单状态后，打开新的订单记录页面。
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (context) => OrderRecordPage(
-          initialStatusLabel: statusLabel,
-          onAdvanceOrderStatus: onAdvanceOrderStatus,
+          initialStatus: status,
           onRepayOrder: onRepayOrder,
+          onConfirmOrder: onConfirmOrder,
+          onCancelOrder: onCancelOrder,
         ),
       ),
     );
@@ -192,30 +199,23 @@ class _OrderStatusOverview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final List<_OrderStatusItem> statusItems = [
-      _OrderStatusItem(
-        label: OrderStatus.pendingPayment.label,
-        count: orders
-            .where((order) => order.status == OrderStatus.pendingPayment)
-            .length,
-      ),
-      _OrderStatusItem(
-        label: OrderStatus.pendingShipment.label,
-        count: orders
-            .where((order) => order.status == OrderStatus.pendingShipment)
-            .length,
-      ),
-      _OrderStatusItem(
-        label: OrderStatus.pendingDelivery.label,
-        count: orders
-            .where((order) => order.status == OrderStatus.pendingDelivery)
-            .length,
-      ),
-      _OrderStatusItem(
-        label: OrderStatus.completed.label,
-        count: orders.where((order) => order.status == OrderStatus.completed).length,
-      ),
+    // 入口固定四个主流程状态；已取消 / 已退款属于终态，
+    // 当前没有续操作入口，暂不占用一席。
+    final List<OrderStatus> entryStatuses = <OrderStatus>[
+      OrderStatus.pendingPayment,
+      OrderStatus.pendingShipment,
+      OrderStatus.pendingDelivery,
+      OrderStatus.completed,
     ];
+
+    final List<_OrderStatusItem> statusItems = entryStatuses
+        .map(
+          (status) => _OrderStatusItem(
+            status: status,
+            count: orders.where((order) => order.status == status).length,
+          ),
+        )
+        .toList(growable: false);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -238,7 +238,7 @@ class _OrderStatusOverview extends StatelessWidget {
                   child: InkWell(
                     key: ValueKey<String>('profile-order-status-${item.label}'),
                     borderRadius: BorderRadius.circular(18),
-                    onTap: () => _openOrderRecordPage(context, item.label),
+                    onTap: () => _openOrderRecordPage(context, item.status),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -290,7 +290,7 @@ class _ProfileEmptyOrderCard extends StatelessWidget {
 }
 
 class _ProfileLatestOrderCard extends StatelessWidget {
-  final OrderRecord order;
+  final OrderVO order;
 
   const _ProfileLatestOrderCard({required this.order});
 
@@ -315,7 +315,7 @@ class _ProfileLatestOrderCard extends StatelessWidget {
           Text(order.statusLabel, style: Theme.of(context).textTheme.bodyLarge),
           const SizedBox(height: 12),
           Text(
-            '订单编号 ${order.id}',
+            '订单编号 ${order.orderNo}',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 8),
@@ -332,7 +332,7 @@ class _ProfileLatestOrderCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(item.name),
+                  Text(item.productName),
                   Text(
                     '数量 x${item.quantity}',
                     style: Theme.of(context).textTheme.bodySmall,
@@ -343,14 +343,14 @@ class _ProfileLatestOrderCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '合计 ${order.totalPriceLabel}',
+            '合计 ${order.payAmountLabel}',
             style: Theme.of(
               context,
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 8),
           Text(
-            '地址 ${order.shippingAddressLabel}',
+            '地址 ${order.receiverAddress}',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
         ],
@@ -510,8 +510,10 @@ class _ProfileAddressSection extends StatelessWidget {
 }
 
 class _OrderStatusItem {
-  final String label;
+  final OrderStatus status;
   final int count;
 
-  const _OrderStatusItem({required this.label, required this.count});
+  const _OrderStatusItem({required this.status, required this.count});
+
+  String get label => status.label;
 }

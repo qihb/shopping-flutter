@@ -11,6 +11,7 @@ import 'package:my_first_app/features/auth/data/token_store.dart';
 import 'package:my_first_app/features/cart/application/cart_notifier.dart';
 import 'package:my_first_app/features/cart/data/cart_service.dart';
 import 'package:my_first_app/features/order/application/order_notifier.dart';
+import 'package:my_first_app/features/order/data/order_service.dart';
 import 'package:my_first_app/features/payment/application/payment_service_factory.dart';
 import 'package:my_first_app/features/product/data/product_service.dart';
 import 'package:my_first_app/features/profile/application/address_notifier.dart';
@@ -38,12 +39,16 @@ class MyApp extends StatelessWidget {
   /// 可选注入的收货地址 Notifier，主要用于测试时替换服务端地址实现。
   final AddressNotifier? addressNotifier;
 
+  /// 可选注入的订单 Notifier，主要用于测试时替换服务端订单实现。
+  final OrderNotifier? orderNotifier;
+
   const MyApp({
     super.key,
     this.productService,
     this.authNotifier,
     this.cartNotifier,
     this.addressNotifier,
+    this.orderNotifier,
   });
 
   /// 创建真实环境的登录态管理。
@@ -109,6 +114,25 @@ class MyApp extends StatelessWidget {
     );
   }
 
+  /// 创建真实环境的订单状态管理。
+  ///
+  /// 下单与状态流转走订单接口，支付动作经 [PaymentServiceFactory]
+  /// 组装为服务端模拟支付网关；两者共用同一个带登录态的 [ApiClient]。
+  OrderNotifier _createOrderNotifier() {
+    final ApiClient apiClient = ApiClient(
+      baseUrl: AppConfigStore.instance.apiBaseUrl,
+      tokenProvider: SharedPrefsTokenStore().readToken,
+    );
+
+    return OrderNotifier(
+      orderService: OrderService(apiClient: apiClient),
+      paymentService: PaymentServiceFactory.create(
+        AppConfigStore.instance,
+        apiClient: apiClient,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final appConfig = AppConfigStore.instance;
@@ -127,9 +151,13 @@ class MyApp extends StatelessWidget {
           },
         ),
         ChangeNotifierProvider<OrderNotifier>(
-          create: (_) => OrderNotifier(
-            paymentService: PaymentServiceFactory.create(appConfig),
-          ),
+          create: (context) {
+            final OrderNotifier notifier =
+                orderNotifier ?? _createOrderNotifier();
+            // 登录 / 退出时自动拉取或清空订单，无需页面手动编排。
+            notifier.attachAuth(context.read<AuthNotifier>());
+            return notifier;
+          },
         ),
         ChangeNotifierProvider<AddressNotifier>(
           create: (context) {

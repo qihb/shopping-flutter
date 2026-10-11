@@ -2,6 +2,10 @@ import 'package:mockito/mockito.dart';
 
 import 'package:my_first_app/features/cart/data/models/cart_item_vo.dart';
 import 'package:my_first_app/features/cart/data/models/cart_vo.dart';
+import 'package:my_first_app/features/order/data/models/order_item_vo.dart';
+import 'package:my_first_app/features/order/data/models/order_status.dart';
+import 'package:my_first_app/features/order/data/models/order_vo.dart';
+import 'package:my_first_app/features/payment/data/models/pay_result_vo.dart';
 import 'package:my_first_app/features/product/data/models/category_node.dart';
 import 'package:my_first_app/features/product/data/models/page_result.dart';
 import 'package:my_first_app/features/product/data/models/product_detail.dart';
@@ -262,4 +266,104 @@ void stubAddressMutationsSuccess(MockAddressService service) {
   )).thenAnswer((_) async {});
   when(service.deleteAddress(any)).thenAnswer((_) async {});
   when(service.setDefaultAddress(any)).thenAnswer((_) async {});
+}
+
+/// 构造一条测试用的订单明细快照。
+///
+/// 默认价格为 89 元、数量 1，小计按单价 × 数量推算，与订单快照口径一致。
+OrderItemVO buildTestOrderItemVO(
+  int productId,
+  String productName, {
+  int skuId = 9001,
+  String skuSpecs = '默认规格',
+  String productImage = '',
+  double price = 89,
+  int quantity = 1,
+}) {
+  return OrderItemVO(
+    productId: productId,
+    skuId: skuId,
+    productName: productName,
+    skuSpecs: skuSpecs,
+    productImage: productImage,
+    price: price,
+    quantity: quantity,
+    subtotal: price * quantity,
+  );
+}
+
+/// 构造一条测试用的订单。
+///
+/// 默认待发货状态、实付 89 元，明细缺省为一件「夏季轻运动鞋」，
+/// 单价取实付金额，保证金额文案与明细小计能对上。
+OrderVO buildTestOrderVO(
+  int id,
+  String orderNo, {
+  OrderStatus status = OrderStatus.pendingShipment,
+  double totalAmount = 89,
+  double payAmount = 89,
+  String receiverName = 'Qi Hai Bing',
+  String receiverPhone = '13800001234',
+  String receiverAddress = '上海市浦东新区张江高科',
+  String remark = '',
+  String createTime = '2026-01-01 10:00:00',
+  List<OrderItemVO> items = const <OrderItemVO>[],
+}) {
+  return OrderVO(
+    id: id,
+    orderNo: orderNo,
+    totalAmount: totalAmount,
+    payAmount: payAmount,
+    status: status,
+    statusDesc: status.label,
+    receiverName: receiverName,
+    receiverPhone: receiverPhone,
+    receiverAddress: receiverAddress,
+    remark: remark,
+    createTime: createTime,
+    payTime: '',
+    shipTime: '',
+    finishTime: '',
+    cancelTime: '',
+    items: items.isEmpty
+        ? <OrderItemVO>[buildTestOrderItemVO(1, '夏季轻运动鞋', price: payAmount)]
+        : List<OrderItemVO>.of(items),
+  );
+}
+
+/// 构造一条测试用的支付结果，默认支付成功。
+PayResultVO buildTestPayResultVO(
+  String orderNo, {
+  double amount = 89,
+  int status = PayResultVO.statusSuccess,
+  String payTime = '2026-01-01 10:05:00',
+}) {
+  return PayResultVO(
+    orderNo: orderNo,
+    amount: amount,
+    status: status,
+    payTime: payTime,
+  );
+}
+
+/// 给 [MockOrderService] 打桩：fetchOrders 固定返回给定订单列表。
+void stubOrderFetch(MockOrderService service, List<OrderVO> orders) {
+  when(service.fetchOrders(current: anyNamed('current')))
+      .thenAnswer((_) async => List<OrderVO>.of(orders));
+}
+
+/// 给 [MockOrderService] 打桩：所有变更操作默认成功，
+/// 下单固定返回服务端生成的订单号 ORD-0000001。
+void stubOrderMutationsSuccess(MockOrderService service) {
+  when(service.createOrder(
+    addressId: anyNamed('addressId'),
+    remark: anyNamed('remark'),
+  )).thenAnswer((_) async => 'ORD-0000001');
+  when(service.confirmReceipt(any)).thenAnswer((_) async {});
+  when(service.cancelOrder(any)).thenAnswer((_) async {});
+}
+
+/// 给 [MockPayService] 打桩：mockPay 固定返回给定支付结果。
+void stubPayResult(MockPayService service, PayResultVO result) {
+  when(service.mockPay(any)).thenAnswer((_) async => result);
 }

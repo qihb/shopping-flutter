@@ -1,17 +1,23 @@
 import 'package:flutter/material.dart';
 
-import 'package:my_first_app/features/cart/presentation/models/cart_item.dart';
+import 'package:my_first_app/core/utils/amount_label.dart';
+import 'package:my_first_app/features/cart/data/models/cart_item_vo.dart';
 import 'package:my_first_app/features/payment/presentation/models/payment_method.dart';
-import 'package:my_first_app/features/profile/presentation/models/user_address.dart';
+import 'package:my_first_app/features/profile/data/models/address_vo.dart';
 
 /// 订单确认页。
 ///
 /// 位于“购物车”和“订单生成”之间，对应结算流程中的“最后确认信息”步骤。
+/// 商品与地址直接使用服务端数据（[CartItemVO] / [AddressVO]），
+/// 支付动作通过 [onConfirmPayment] 交还给页面编排层。
 ///
 /// 使用 `StatefulWidget`，因为“当前选中的支付方式”属于页面本地交互状态。
 class OrderConfirmPage extends StatefulWidget {
-  final List<CartItem> items;
-  final UserAddress address;
+  /// 已勾选且有效的购物车条目（服务端数据）。
+  final List<CartItemVO> items;
+
+  /// 下单使用的收货地址（服务端数据）。
+  final AddressVO address;
   final Future<void> Function(PaymentMethod method) onConfirmPayment;
 
   const OrderConfirmPage({
@@ -40,9 +46,10 @@ class _OrderConfirmPageState extends State<OrderConfirmPage> {
 
   @override
   Widget build(BuildContext context) {
-    final int totalPrice = widget.items.fold<int>(
+    // 应付合计与购物车页一样按条目小计累加，与服务端勾选金额口径一致。
+    final double totalAmount = widget.items.fold<double>(
       0,
-      (sum, item) => sum + item.totalPrice,
+      (sum, item) => sum + item.subtotal,
     );
 
     return Scaffold(
@@ -56,13 +63,13 @@ class _OrderConfirmPageState extends State<OrderConfirmPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.address.recipientName,
+                  widget.address.receiverName,
                   style: Theme.of(
                     context,
                   ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 8),
-                Text(widget.address.phone),
+                Text(widget.address.receiverPhone),
                 const SizedBox(height: 8),
                 Text(widget.address.fullAddress),
               ],
@@ -78,10 +85,10 @@ class _OrderConfirmPageState extends State<OrderConfirmPage> {
                       padding: const EdgeInsets.only(bottom: 12),
                       child: Row(
                         children: [
-                          Expanded(child: Text(item.name)),
+                          Expanded(child: Text(item.productName)),
                           Text('x${item.quantity}'),
                           const SizedBox(width: 12),
-                          Text(item.totalPriceLabel),
+                          Text('¥${amountLabel(item.subtotal)}'),
                         ],
                       ),
                     ),
@@ -129,8 +136,8 @@ class _OrderConfirmPageState extends State<OrderConfirmPage> {
           _ConfirmSectionCard(
             title: '支付说明',
             child: Text(
-              '支付宝已接入 SDK 调用链路，当前支付参数由本地测试数据提供，'
-              '不会产生真实扣款；微信支付与真实商户参数将在后续版本接入。',
+              '当前使用服务端模拟支付网关完成扣款演示，不会产生真实扣款；'
+              '支付宝与微信的真实商户能力将在后续版本接入。',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.6),
             ),
           ),
@@ -144,7 +151,7 @@ class _OrderConfirmPageState extends State<OrderConfirmPage> {
             children: [
               Expanded(
                 child: Text(
-                  '应付 ¥$totalPrice',
+                  '应付 ¥${amountLabel(totalAmount)}',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),

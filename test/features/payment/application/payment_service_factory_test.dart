@@ -2,14 +2,17 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:my_first_app/app/config/app_config.dart';
 import 'package:my_first_app/app/config/app_environment.dart';
+import 'package:my_first_app/core/api/api_client.dart';
+import 'package:my_first_app/features/payment/application/payment_gateway.dart';
 import 'package:my_first_app/features/payment/application/payment_service.dart';
 import 'package:my_first_app/features/payment/application/payment_service_factory.dart';
+import 'package:my_first_app/features/payment/data/gateways/remote_pay_gateway.dart';
 import 'package:my_first_app/features/payment/data/models/payment_request.dart';
 import 'package:my_first_app/features/payment/presentation/models/payment_method.dart';
 import 'package:my_first_app/features/payment/presentation/models/payment_result.dart';
 
 void main() {
-  test('PaymentServiceFactory 在关闭真实支付时返回 Mock 支付服务', () async {
+  test('PaymentServiceFactory 在关闭真实支付时返回服务端模拟网关', () {
     const AppConfig config = AppConfig(
       environment: AppEnvironment.dev,
       appName: 'My First App Dev',
@@ -20,19 +23,19 @@ void main() {
       wechatAppId: 'mock-wechat-app-id',
       wechatUniversalLink: 'https://example.com/dev/link/',
     );
-    final PaymentService service = PaymentServiceFactory.create(config);
-
-    final PaymentResult result = await service.pay(
-      const PaymentRequest(
-        orderId: 'ORD-0000001',
-        amount: 89,
-        title: '夏季轻运动鞋',
-        method: PaymentMethod.alipay,
-      ),
+    final PaymentService service = PaymentServiceFactory.create(
+      config,
+      apiClient: ApiClient(baseUrl: 'https://dev-api.example.com'),
     );
 
-    expect(result.status, PaymentStatus.success);
-    expect(result.message, '支付宝支付成功');
+    // 模拟支付走服务端网关：两个渠道共用同一个 RemotePayGateway 实例，
+    // 支付动作最终落到 /api/pay/{orderNo}/mockPay。
+    final PaymentGateway? alipayGateway = service.gateways[PaymentMethod.alipay];
+    final PaymentGateway? wechatGateway =
+        service.gateways[PaymentMethod.wechatPay];
+
+    expect(alipayGateway, isA<RemotePayGateway>());
+    expect(identical(alipayGateway, wechatGateway), isTrue);
   });
 
   test('PaymentServiceFactory 在打开真实支付时返回真实网关骨架', () async {
@@ -46,7 +49,10 @@ void main() {
       wechatAppId: 'real-wechat-app-id',
       wechatUniversalLink: 'https://example.com/prod/link/',
     );
-    final PaymentService service = PaymentServiceFactory.create(config);
+    final PaymentService service = PaymentServiceFactory.create(
+      config,
+      apiClient: ApiClient(baseUrl: 'https://api.example.com'),
+    );
 
     final PaymentResult result = await service.pay(
       const PaymentRequest(
@@ -72,7 +78,10 @@ void main() {
       wechatAppId: 'real-wechat-app-id',
       wechatUniversalLink: 'https://example.com/prod/link/',
     );
-    final PaymentService service = PaymentServiceFactory.create(config);
+    final PaymentService service = PaymentServiceFactory.create(
+      config,
+      apiClient: ApiClient(baseUrl: 'https://api.example.com'),
+    );
 
     final PaymentResult result = await service.pay(
       const PaymentRequest(

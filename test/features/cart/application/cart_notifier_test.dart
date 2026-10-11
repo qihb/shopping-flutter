@@ -6,7 +6,6 @@ import 'package:my_first_app/features/auth/application/auth_notifier.dart';
 import 'package:my_first_app/features/auth/data/models/user_info.dart';
 import 'package:my_first_app/features/cart/application/cart_notifier.dart';
 import 'package:my_first_app/features/cart/data/models/cart_item_vo.dart';
-import 'package:my_first_app/features/cart/presentation/models/cart_item.dart';
 import '../../../helpers/mocks.mocks.dart';
 import '../../../helpers/stub_helpers.dart';
 
@@ -248,8 +247,8 @@ void main() {
     });
   });
 
-  group('selectedItems 桥接', () {
-    test('只保留已勾选且有效的条目，并映射成旧 CartItem 模型', () async {
+  group('selectedItems 结算范围', () {
+    test('只保留已勾选且有效的服务端条目', () async {
       final MockCartService cartService = MockCartService();
       final CartNotifier cartNotifier = CartNotifier(cartService: cartService);
       stubCartFetch(
@@ -270,12 +269,11 @@ void main() {
       await cartNotifier.refresh();
 
       expect(cartNotifier.selectedItems, hasLength(1));
-      final CartItem bridgeItem = cartNotifier.selectedItems.single;
-      expect(bridgeItem.name, '已勾选商品');
-      expect(bridgeItem.unitPrice, 89);
-      expect(bridgeItem.priceLabel, '¥89');
-      expect(bridgeItem.quantity, 1);
-      expect(bridgeItem.totalPriceLabel, '¥89');
+      final CartItemVO settleable = cartNotifier.selectedItems.single;
+      expect(settleable.productName, '已勾选商品');
+      expect(settleable.price, 89);
+      expect(settleable.quantity, 1);
+      expect(settleable.subtotal, 89);
     });
   });
 }

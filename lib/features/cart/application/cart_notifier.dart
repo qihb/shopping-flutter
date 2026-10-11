@@ -5,7 +5,6 @@ import 'package:my_first_app/features/auth/application/auth_notifier.dart';
 import 'package:my_first_app/features/cart/data/cart_service.dart';
 import 'package:my_first_app/features/cart/data/models/cart_item_vo.dart';
 import 'package:my_first_app/features/cart/data/models/cart_vo.dart';
-import 'package:my_first_app/features/cart/presentation/models/cart_item.dart';
 
 /// 购物车状态管理（服务端化版本）。
 ///
@@ -53,20 +52,19 @@ class CartNotifier extends ChangeNotifier {
   /// 是否没有任何条目。
   bool get isEmpty => _cart == null || _cart!.items.isEmpty;
 
-  /// 已勾选且有效的条目，映射成订单确认页当前使用的旧 [CartItem] 桥接模型。
+  /// 已勾选且有效的条目，即「去结算」时的下单范围。
   ///
-  /// 下单流程对接后端订单接口前，订单确认页仍以旧 `CartItem` 为入参，
-  /// 这里做一层映射完成过渡；订单域服务端化之后会整体替换。
-  List<CartItem> get selectedItems {
+  /// 订单确认页与下单编排都以这份服务端条目为准，
+  /// 失效条目与未勾选条目不参与结算。
+  List<CartItemVO> get selectedItems {
     final CartVO? currentCart = _cart;
 
     if (currentCart == null) {
-      return const <CartItem>[];
+      return const <CartItemVO>[];
     }
 
     return currentCart.items
         .where((CartItemVO item) => item.checked && !item.invalid)
-        .map(_toBridgeItem)
         .toList(growable: false);
   }
 
@@ -243,19 +241,5 @@ class CartNotifier extends ChangeNotifier {
     }
 
     return fallback;
-  }
-
-  /// 服务端条目 → 订单确认页桥接模型。
-  ///
-  /// 金额沿用旧模型「向下取整」的处理，保证购物车页与订单确认页展示一致。
-  CartItem _toBridgeItem(CartItemVO item) {
-    final int unitPrice = item.price.truncate();
-
-    return CartItem(
-      name: item.productName,
-      priceLabel: '¥$unitPrice',
-      unitPrice: unitPrice,
-      quantity: item.quantity,
-    );
   }
 }

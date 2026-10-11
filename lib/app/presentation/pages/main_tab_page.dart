@@ -2,14 +2,13 @@ import 'package:flutter/material.dart';
 
 import 'package:my_first_app/features/category/presentation/pages/category_page.dart';
 import 'package:my_first_app/features/cart/application/cart_notifier.dart';
-import 'package:my_first_app/features/cart/presentation/models/cart_item.dart';
+import 'package:my_first_app/features/cart/data/models/cart_item_vo.dart';
 import 'package:my_first_app/features/cart/presentation/pages/cart_page.dart';
 import 'package:my_first_app/features/home/presentation/pages/home_page.dart';
 import 'package:my_first_app/features/order/application/order_notifier.dart';
-import 'package:my_first_app/features/order/presentation/models/order_record.dart';
+import 'package:my_first_app/features/order/data/models/order_vo.dart';
 import 'package:my_first_app/features/order/presentation/pages/order_confirm_page.dart';
 import 'package:my_first_app/features/payment/presentation/models/payment_method.dart';
-import 'package:my_first_app/features/payment/presentation/models/payment_result.dart';
 import 'package:my_first_app/features/product/data/models/category_node.dart';
 import 'package:my_first_app/features/product/data/models/product_sku.dart';
 import 'package:my_first_app/features/product/data/models/product_summary.dart';
@@ -17,7 +16,6 @@ import 'package:my_first_app/features/product/data/product_service.dart';
 import 'package:my_first_app/features/profile/application/address_notifier.dart';
 import 'package:my_first_app/features/profile/application/settings_notifier.dart';
 import 'package:my_first_app/features/profile/data/models/address_vo.dart';
-import 'package:my_first_app/features/profile/presentation/models/user_address.dart';
 import 'package:my_first_app/features/profile/presentation/models/user_profile_summary.dart';
 import 'package:my_first_app/features/profile/presentation/pages/profile_page.dart';
 import 'package:provider/provider.dart';
@@ -64,20 +62,6 @@ class _MainTabPageState extends State<MainTabPage> {
       phone: user?.phone ?? '',
       memberLabel: user != null ? '成长会员' : '',
       defaultAddress: addressNotifier.defaultAddress?.fullAddress ?? '暂未设置',
-    );
-  }
-
-  /// 服务端地址 → 订单域收货快照模型。
-  ///
-  /// 订单确认页与订单记录目前仍以旧 [UserAddress] 为入参，
-  /// 这里做一层映射完成过渡；订单域服务端化之后会整体替换。
-  UserAddress _toOrderAddress(AddressVO address) {
-    return UserAddress(
-      recipientName: address.receiverName,
-      phone: address.receiverPhone,
-      cityLabel: address.regionLabel,
-      detailAddress: address.detailAddress,
-      isDefault: address.isDefault,
     );
   }
 
@@ -171,7 +155,7 @@ class _MainTabPageState extends State<MainTabPage> {
   void _openOrderConfirmPage(BuildContext context) {
     final CartNotifier cartNotifier = context.read<CartNotifier>();
     // 下单来源固定为购物车勾选项（已勾选且有效的条目）。
-    final List<CartItem> selectedItems = cartNotifier.selectedItems;
+    final List<CartItemVO> selectedItems = cartNotifier.selectedItems;
 
     if (selectedItems.isEmpty) {
       return;
@@ -189,9 +173,13 @@ class _MainTabPageState extends State<MainTabPage> {
       MaterialPageRoute<void>(
         builder: (context) => OrderConfirmPage(
           items: selectedItems,
-          address: _toOrderAddress(address),
+          address: address,
           onConfirmPayment: (method) async {
-            final bool didSucceed = await _submitOrder(context, method);
+            final bool didSucceed = await _submitOrder(
+              context,
+              addressId: address.id,
+              method: method,
+            );
             if (!context.mounted) {
               return;
             }
@@ -205,90 +193,99 @@ class _MainTabPageState extends State<MainTabPage> {
     );
   }
 
+  /// 下单 + 支付的完整编排：先创建订单拿到服务端订单号，再发起支付。
+  ///
+  /// 订单创建成功但支付失败时，订单会停留在「待付款」，
+  /// 用户可以在订单记录里继续支付；支付成功后清理购物车勾选项。
   Future<bool> _submitOrder(
-    BuildContext context,
-    PaymentMethod method,
-  ) async {
-    final CartNotifier cartNotifier = context.read<CartNotifier>();
-    final OrderNotifier orderNotifier = context.read<OrderNotifier>();
-    final AddressNotifier addressNotifier = context.read<AddressNotifier>();
-
-    if (cartNotifier.selectedItems.isEmpty) {
-      return false;
-    }
-
-    // 下单入口已做过无地址守卫，这里再兜底一次，避免空地址快照写入订单。
-    final AddressVO? address = addressNotifier.defaultAddress;
-
-    if (address == null) {
-      return false;
-    }
-
-    final PaymentResult result = await orderNotifier.submitOrder(
-      cartItems: cartNotifier.selectedItems,
-      shippingAddress: _toOrderAddress(address),
-      method: method,
-    );
-
-    if (result.status == PaymentStatus.success) {
-      // 下单来源是购物车勾选项，支付成功后从服务端移除已勾选条目。
-      await cartNotifier.removeCheckedItems();
-    }
-
-    // 支付流程跨了异步间隙，弹提示前必须确认页面还在组件树里。
-    if (!context.mounted) {
-      return result.status == PaymentStatus.success;
-    }
-
-    _showMessage(context, result.message);
-    return result.status == PaymentStatus.success;
-  }
-
-  // ---------- 重新支付 ----------
-
-  Future<bool> _openRepayOrderConfirmPage(
     BuildContext context, {
-    required OrderRecord order,
-  }) async {
-    final bool? didSucceed = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (context) => OrderConfirmPage(
-          items: order.items,
-          address: order.shippingAddress,
-          onConfirmPayment: (method) async {
-            final bool ok = await _repayOrder(context, order: order, method: method);
-            if (!context.mounted) {
-              return;
-            }
-            Navigator.of(context).pop(ok);
-          },
-        ),
-      ),
-    );
-
-    if (didSucceed == true) {
-      _switchTab(3);
-    }
-
-    return didSucceed ?? false;
-  }
-
-  Future<bool> _repayOrder(
-    BuildContext context, {
-    required OrderRecord order,
+    required int addressId,
     required PaymentMethod method,
   }) async {
     final OrderNotifier orderNotifier = context.read<OrderNotifier>();
-    final bool didSucceed = await orderNotifier.repayOrder(order, method);
+
+    final String? orderNo = await orderNotifier.createOrder(
+      addressId: addressId,
+    );
+
+    if (!context.mounted) {
+      return false;
+    }
+
+    if (orderNo == null) {
+      _showMessage(context, orderNotifier.errorMessage ?? '创建订单失败，请稍后重试');
+      return false;
+    }
+
+    final bool didSucceed = await orderNotifier.payOrder(orderNo, method: method);
+
+    if (!context.mounted) {
+      return didSucceed;
+    }
+
+    if (didSucceed) {
+      // 下单来源是购物车勾选项，支付成功后从服务端移除已勾选条目。
+      await context.read<CartNotifier>().removeCheckedItems();
+      if (!context.mounted) {
+        return true;
+      }
+      _showMessage(context, '支付成功');
+    } else {
+      _showMessage(context, orderNotifier.errorMessage ?? '支付失败，请稍后重试');
+    }
+
     return didSucceed;
   }
 
-  // ---------- 推进订单状态 ----------
+  // ---------- 订单动作 ----------
 
-  void _advanceOrderStatus(BuildContext context, OrderRecord order) {
+  /// 继续支付待付款订单（支付渠道沿用默认收银台渠道）。
+  Future<bool> _repayOrder(BuildContext context, OrderVO order) async {
     final OrderNotifier orderNotifier = context.read<OrderNotifier>();
-    orderNotifier.advanceStatus(order);
-    _showMessage(context, '订单状态已更新为：${order.nextStatusLabel}');
+    final bool didSucceed = await orderNotifier.payOrder(order.orderNo);
+
+    if (context.mounted) {
+      _showMessage(
+        context,
+        didSucceed ? '支付成功' : orderNotifier.errorMessage ?? '支付失败，请稍后重试',
+      );
+    }
+
+    if (didSucceed) {
+      _switchTab(3);
+    }
+
+    return didSucceed;
+  }
+
+  /// 确认收货：待收货 → 已完成。
+  Future<bool> _confirmReceipt(BuildContext context, OrderVO order) async {
+    final OrderNotifier orderNotifier = context.read<OrderNotifier>();
+    final bool didSucceed = await orderNotifier.confirmReceipt(order.orderNo);
+
+    if (context.mounted) {
+      _showMessage(
+        context,
+        didSucceed ? '已确认收货' : orderNotifier.errorMessage ?? '确认收货失败，请稍后重试',
+      );
+    }
+
+    return didSucceed;
+  }
+
+  /// 取消订单：待付款 → 已取消（服务端回滚库存）。
+  Future<bool> _cancelOrder(BuildContext context, OrderVO order) async {
+    final OrderNotifier orderNotifier = context.read<OrderNotifier>();
+    final bool didSucceed = await orderNotifier.cancelOrder(order.orderNo);
+
+    if (context.mounted) {
+      _showMessage(
+        context,
+        didSucceed ? '订单已取消' : orderNotifier.errorMessage ?? '取消订单失败，请稍后重试',
+      );
+    }
+
+    return didSucceed;
   }
 
   // ---------- 设置 ----------
@@ -358,13 +355,16 @@ class _MainTabPageState extends State<MainTabPage> {
             isLoggedIn: authNotifier.isAuthenticated,
             addresses: addressNotifier.addresses,
             settings: settingsNotifier.settings,
-            orders: orderNotifier.displayOrders,
-            onAdvanceOrderStatus: orderNotifier.orders.isEmpty
-                ? null
-                : (order) => _advanceOrderStatus(context, order),
+            orders: orderNotifier.orders,
             onRepayOrder: orderNotifier.orders.isEmpty
                 ? null
-                : (order) => _openRepayOrderConfirmPage(context, order: order),
+                : (order) => _repayOrder(context, order),
+            onConfirmOrder: orderNotifier.orders.isEmpty
+                ? null
+                : (order) => _confirmReceipt(context, order),
+            onCancelOrder: orderNotifier.orders.isEmpty
+                ? null
+                : (order) => _cancelOrder(context, order),
             onNotificationChanged: (value) =>
                 _updateNotificationSetting(context, value),
             onBiometricUnlockChanged: (value) =>

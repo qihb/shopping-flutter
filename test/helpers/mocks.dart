@@ -4,9 +4,12 @@ import 'package:mockito/annotations.dart';
 import 'package:my_first_app/features/auth/data/auth_service.dart';
 import 'package:my_first_app/features/auth/data/token_store.dart';
 import 'package:my_first_app/features/cart/data/cart_service.dart';
+import 'package:my_first_app/features/order/data/order_service.dart';
 import 'package:my_first_app/features/payment/application/payment_gateway.dart';
 import 'package:my_first_app/features/payment/application/payment_order_provider.dart';
 import 'package:my_first_app/features/payment/application/payment_sdk_initializer.dart';
+import 'package:my_first_app/features/payment/application/payment_service.dart';
+import 'package:my_first_app/features/payment/data/pay_service.dart';
 import 'package:my_first_app/features/product/data/product_service.dart';
 import 'package:my_first_app/features/profile/data/address_service.dart';
 
@@ -31,6 +34,12 @@ import 'package:my_first_app/features/profile/data/address_service.dart';
   MockSpec<CartService>(),
   // 收货地址服务：地址相关测试的数据源替身。
   MockSpec<AddressService>(),
+  // 订单服务：订单相关测试的数据源替身。
+  MockSpec<OrderService>(),
+  // 支付服务（服务端模拟支付接口）：支付相关测试的数据源替身。
+  MockSpec<PayService>(),
+  // 支付服务（网关分发）：OrderNotifier 测试的支付动作替身。
+  MockSpec<PaymentService>(),
   // 商品域服务：首页/分类/详情相关测试的数据源替身。
   MockSpec<ProductService>(),
   // 支付网关接口：支付流程测试的替身。

@@ -12,6 +12,8 @@ import 'package:my_first_app/features/cart/data/models/cart_item_vo.dart';
 import 'package:my_first_app/features/cart/data/models/cart_vo.dart';
 import 'package:my_first_app/features/cart/presentation/pages/cart_page.dart';
 import 'package:my_first_app/features/order/application/order_notifier.dart';
+import 'package:my_first_app/features/order/data/models/order_status.dart';
+import 'package:my_first_app/features/order/data/models/order_vo.dart';
 import 'package:my_first_app/features/payment/application/payment_gateway.dart';
 import 'package:my_first_app/features/payment/application/payment_service.dart';
 import 'package:my_first_app/features/payment/data/models/payment_request.dart';
@@ -411,35 +413,148 @@ MockAddressService _buildAddressService() {
   return service;
 }
 
-/// 创建默认支付成功的网关（用于不需要自定义支付结果的测试）。
-MockPaymentGateway _buildSuccessGateway() {
-  final MockPaymentGateway gateway = MockPaymentGateway();
-  when(gateway.pay(any)).thenAnswer(
-    (_) async => const PaymentResult(
-      method: PaymentMethod.alipay,
-      status: PaymentStatus.success,
-      message: '支付成功',
-    ),
-  );
-  return gateway;
+/// 服务端模拟支付成功时的默认结果。
+const PaymentResult _alipaySuccessResult = PaymentResult(
+  method: PaymentMethod.alipay,
+  status: PaymentStatus.success,
+  message: '支付成功',
+);
+
+const PaymentResult _wechatSuccessResult = PaymentResult(
+  method: PaymentMethod.wechatPay,
+  status: PaymentStatus.success,
+  message: '支付成功',
+);
+
+/// 服务端订单假实现：内存快照 + 最小状态机，
+/// 模拟 spring-shop 的 /api/orders 与 /api/pay 行为。
+///
+/// 与真实服务端的交互顺序保持一致：变更接口只改服务端数据不返回列表，
+/// `OrderNotifier` 每次变更后重新调用 [fetchOrders] 读回最新状态。
+class _FakeOrderServer {
+  /// 服务端地址快照：下单时按 addressId 固化收货地址。
+  static const Map<int, String> _addressSnapshots = <int, String>{
+    1: '上海市浦东新区张江高科',
+    2: '上海市徐汇区漕河泾开发区',
+  };
+
+  List<OrderVO> _orders;
+  int _nextOrderSeq = 1;
+
+  _FakeOrderServer({List<OrderVO> seedOrders = const <OrderVO>[]})
+      : _orders = List<OrderVO>.of(seedOrders);
+
+  List<OrderVO> fetchOrders() => List<OrderVO>.of(_orders);
+
+  String createOrder({required int addressId, String? remark}) {
+    final String orderNo = 'ORD-${_nextOrderSeq.toString().padLeft(7, '0')}';
+    _nextOrderSeq += 1;
+    _orders = <OrderVO>[
+      buildTestOrderVO(
+        1000 + _nextOrderSeq,
+        orderNo,
+        status: OrderStatus.pendingPayment,
+        receiverAddress: _addressSnapshots[addressId] ?? '测试收货地址',
+        remark: remark ?? '',
+      ),
+      ..._orders,
+    ];
+    return orderNo;
+  }
+
+  /// 模拟支付成功：待付款 → 待发货。
+  void markPaid(String orderNo) {
+    _replaceStatus(orderNo, OrderStatus.pendingShipment);
+  }
+
+  /// 确认收货：待收货 → 已完成。
+  void confirmReceipt(String orderNo) {
+    _replaceStatus(orderNo, OrderStatus.completed);
+  }
+
+  /// 取消订单：待付款 → 已取消。
+  void cancelOrder(String orderNo) {
+    _replaceStatus(orderNo, OrderStatus.cancelled);
+  }
+
+  /// 订单模型不可变，状态流转时用原字段快照重建一份。
+  void _replaceStatus(String orderNo, OrderStatus status) {
+    _orders = _orders.map((OrderVO order) {
+      if (order.orderNo != orderNo) {
+        return order;
+      }
+      return OrderVO(
+        id: order.id,
+        orderNo: order.orderNo,
+        totalAmount: order.totalAmount,
+        payAmount: order.payAmount,
+        status: status,
+        statusDesc: order.statusDesc,
+        receiverName: order.receiverName,
+        receiverPhone: order.receiverPhone,
+        receiverAddress: order.receiverAddress,
+        remark: order.remark,
+        createTime: order.createTime,
+        payTime: order.payTime,
+        shipTime: order.shipTime,
+        finishTime: order.finishTime,
+        cancelTime: order.cancelTime,
+        items: order.items,
+      );
+    }).toList();
+  }
 }
 
-/// 创建返回固定结果的网关（用于验证支付参数或失败提示）。
-MockPaymentGateway _buildGatewayWithResult(PaymentResult result) {
-  final MockPaymentGateway gateway = MockPaymentGateway();
-  when(gateway.pay(any)).thenAnswer((_) async => result);
-  return gateway;
+/// 创建订单服务的测试替身：把 Mock 调用转发到假服务端的内存快照。
+MockOrderService _buildOrderService(_FakeOrderServer server) {
+  final MockOrderService service = MockOrderService();
+
+  when(service.fetchOrders(current: anyNamed('current')))
+      .thenAnswer((_) async => server.fetchOrders());
+
+  when(service.createOrder(
+    addressId: anyNamed('addressId'),
+    remark: anyNamed('remark'),
+  )).thenAnswer((Invocation invocation) async {
+    return server.createOrder(
+      addressId: invocation.namedArguments[#addressId] as int,
+      remark: invocation.namedArguments[#remark] as String?,
+    );
+  });
+
+  when(service.confirmReceipt(any)).thenAnswer((Invocation invocation) async {
+    server.confirmReceipt(invocation.positionalArguments.first as String);
+  });
+
+  when(service.cancelOrder(any)).thenAnswer((Invocation invocation) async {
+    server.cancelOrder(invocation.positionalArguments.first as String);
+  });
+
+  return service;
 }
 
-/// 创建按队列依次返回结果的网关（用于模拟失败后重试等序列场景）。
-MockPaymentGateway _buildSequencedGateway(List<PaymentResult> results) {
+/// 创建按队列依次返回结果的支付网关替身。
+///
+/// 支付成功时同步把假服务端里的订单推进到待发货，对应真实链路里
+/// 服务端模拟网关「扣款与订单状态流转一次到位」的行为。
+MockPaymentGateway _buildGateway(
+  List<PaymentResult> results,
+  _FakeOrderServer server,
+) {
   final MockPaymentGateway gateway = MockPaymentGateway();
   final List<PaymentResult> queue = List<PaymentResult>.of(results);
-  when(gateway.pay(any)).thenAnswer((_) async {
+  when(gateway.pay(any)).thenAnswer((Invocation invocation) async {
     if (queue.isEmpty) {
       throw StateError('没有可用的支付结果可供测试消费');
     }
-    return queue.removeAt(0);
+    final PaymentResult result = queue.removeAt(0);
+
+    if (result.status == PaymentStatus.success) {
+      final PaymentRequest request =
+          invocation.positionalArguments.single as PaymentRequest;
+      server.markPaid(request.orderId);
+    }
+    return result;
   });
   return gateway;
 }
@@ -449,35 +564,53 @@ PaymentRequest _capturedPayRequest(MockPaymentGateway gateway) {
   return verify(gateway.pay(captureAny)).captured.single as PaymentRequest;
 }
 
+/// 一次测试环境装配的结果：根组件与支付网关替身（供请求捕获断言）。
+typedef _TestAppWithGateways = (
+  Widget widget,
+  MockPaymentGateway alipayGateway,
+  MockPaymentGateway wechatGateway,
+);
+
 /// 创建一个用于测试的 MainTabPage Provider 包装。
 ///
 /// `MainTabPage` 通过 Provider 树间接获取状态，
 /// 测试时需要把各个 Notifier 注入进去。
-/// [loggedIn] 为 true 时构造已登录态，购物车相关链路都依赖登录。
-Widget _buildTestApp({
+/// [loggedIn] 为 true 时构造已登录态，购物车 / 订单链路都依赖登录。
+/// [seedOrders] 用于预置服务端订单（如待收货 / 待付款场景）。
+_TestAppWithGateways _buildTestAppWithGateways({
   bool loggedIn = false,
-  PaymentService? paymentService,
+  List<PaymentResult> alipayResults = const <PaymentResult>[
+    _alipaySuccessResult,
+  ],
+  List<PaymentResult> wechatResults = const <PaymentResult>[
+    _wechatSuccessResult,
+  ],
+  List<OrderVO> seedOrders = const <OrderVO>[],
 }) {
   final AuthNotifier authNotifier =
       loggedIn ? _buildLoggedInAuthNotifier() : _buildAuthNotifier();
-  final MockCartService cartService = _buildCartService();
-  final PaymentService service = paymentService ??
-      PaymentService(
-        gateways: <PaymentMethod, PaymentGateway>{
-          PaymentMethod.alipay: _buildSuccessGateway(),
-          PaymentMethod.wechatPay: _buildSuccessGateway(),
-        },
-      );
+  final _FakeOrderServer orderServer = _FakeOrderServer(seedOrders: seedOrders);
+  final MockPaymentGateway alipayGateway = _buildGateway(alipayResults, orderServer);
+  final MockPaymentGateway wechatGateway =
+      _buildGateway(wechatResults, orderServer);
 
-  return MultiProvider(
+  final Widget widget = MultiProvider(
     providers: [
       ChangeNotifierProvider<AuthNotifier>.value(value: authNotifier),
       ChangeNotifierProvider<CartNotifier>(
-        create: (_) => CartNotifier(cartService: cartService)
+        create: (_) => CartNotifier(cartService: _buildCartService())
           ..attachAuth(authNotifier),
       ),
       ChangeNotifierProvider<OrderNotifier>(
-        create: (_) => OrderNotifier(paymentService: service),
+        create: (_) => OrderNotifier(
+          orderService: _buildOrderService(orderServer),
+          paymentService: PaymentService(
+            gateways: <PaymentMethod, PaymentGateway>{
+              PaymentMethod.alipay: alipayGateway,
+              PaymentMethod.wechatPay: wechatGateway,
+            },
+          ),
+        )..attachAuth(authNotifier),
       ),
       ChangeNotifierProvider<AddressNotifier>(
         create: (_) => AddressNotifier(addressService: _buildAddressService())
@@ -491,6 +624,17 @@ Widget _buildTestApp({
       ),
     ),
   );
+
+  return (widget, alipayGateway, wechatGateway);
+}
+
+/// 简单场景装配：不需要支付请求断言的用例使用。
+Widget _buildTestApp({
+  bool loggedIn = false,
+  List<OrderVO> seedOrders = const <OrderVO>[],
+}) {
+  return _buildTestAppWithGateways(loggedIn: loggedIn, seedOrders: seedOrders)
+      .$1;
 }
 
 /// 限定在购物车页子树内查找。
@@ -641,32 +785,21 @@ void main() {
   });
 
   testWidgets('从购物车进入订单确认页后支付成功并在我的页面显示订单', (WidgetTester tester) async {
-    final MockPaymentGateway wechatGateway = _buildGatewayWithResult(
-      const PaymentResult(
-        method: PaymentMethod.wechatPay,
-        status: PaymentStatus.success,
-        message: '微信支付成功',
-      ),
-    );
-    final MockPaymentGateway alipayGateway = _buildGatewayWithResult(
-      const PaymentResult(
-        method: PaymentMethod.alipay,
-        status: PaymentStatus.success,
-        message: '支付宝支付成功',
-      ),
-    );
-
-    await tester.pumpWidget(
-      _buildTestApp(
-        loggedIn: true,
-        paymentService: PaymentService(
-          gateways: <PaymentMethod, PaymentGateway>{
-            PaymentMethod.alipay: alipayGateway,
-            PaymentMethod.wechatPay: wechatGateway,
-          },
+    final (
+      Widget widget,
+      MockPaymentGateway alipayGateway,
+      MockPaymentGateway wechatGateway,
+    ) = _buildTestAppWithGateways(
+      loggedIn: true,
+      wechatResults: <PaymentResult>[
+        const PaymentResult(
+          method: PaymentMethod.wechatPay,
+          status: PaymentStatus.success,
+          message: '微信支付成功',
         ),
-      ),
+      ],
     );
+    await tester.pumpWidget(widget);
 
     await _submitFirstOrderWithWechat(tester);
 
@@ -684,24 +817,21 @@ void main() {
   });
 
   testWidgets('支付失败后会保留待付款订单并展示失败提示', (WidgetTester tester) async {
-    final MockPaymentGateway alipayGateway = _buildGatewayWithResult(
-      const PaymentResult(
-        method: PaymentMethod.alipay,
-        status: PaymentStatus.failure,
-        message: '支付宝支付失败',
-      ),
-    );
-
-    await tester.pumpWidget(
-      _buildTestApp(
-        loggedIn: true,
-        paymentService: PaymentService(
-          gateways: <PaymentMethod, PaymentGateway>{
-            PaymentMethod.alipay: alipayGateway,
-          },
+    final (
+      Widget widget,
+      MockPaymentGateway alipayGateway,
+      MockPaymentGateway _,
+    ) = _buildTestAppWithGateways(
+      loggedIn: true,
+      alipayResults: <PaymentResult>[
+        const PaymentResult(
+          method: PaymentMethod.alipay,
+          status: PaymentStatus.failure,
+          message: '支付宝支付失败',
         ),
-      ),
+      ],
     );
+    await tester.pumpWidget(widget);
 
     await _submitFirstOrder(tester);
 
@@ -717,41 +847,23 @@ void main() {
   });
 
   testWidgets('待付款订单可以继续支付并更新为待发货', (WidgetTester tester) async {
-    final MockPaymentGateway alipayGateway = _buildSequencedGateway(
-      <PaymentResult>[
-        const PaymentResult(
-          method: PaymentMethod.alipay,
-          status: PaymentStatus.failure,
-          message: '支付宝支付失败',
+    final (
+      Widget widget,
+      MockPaymentGateway alipayGateway,
+      MockPaymentGateway _,
+    ) = _buildTestAppWithGateways(
+      loggedIn: true,
+      seedOrders: <OrderVO>[
+        buildTestOrderVO(
+          3001,
+          'ORD-0000001',
+          status: OrderStatus.pendingPayment,
         ),
       ],
     );
-    final MockPaymentGateway wechatGateway = _buildSequencedGateway(
-      <PaymentResult>[
-        const PaymentResult(
-          method: PaymentMethod.wechatPay,
-          status: PaymentStatus.success,
-          message: '微信补支付成功',
-        ),
-      ],
-    );
-
-    await tester.pumpWidget(
-      _buildTestApp(
-        loggedIn: true,
-        paymentService: PaymentService(
-          gateways: <PaymentMethod, PaymentGateway>{
-            PaymentMethod.alipay: alipayGateway,
-            PaymentMethod.wechatPay: wechatGateway,
-          },
-        ),
-      ),
-    );
-
-    await _submitFirstOrder(tester);
+    await tester.pumpWidget(widget);
 
     await _switchToProfileTab(tester);
-    expect(find.text('支付宝支付失败'), findsOneWidget);
     expect(find.text('待付款'), findsWidgets);
 
     await tester.tap(
@@ -760,15 +872,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('当前筛选：待付款'), findsOneWidget);
+    // 继续支付不再重开订单确认页，直接按默认收银台渠道发起支付。
     await tester.tap(
       find.byKey(const ValueKey<String>('order-repay-ORD-0000001')),
     );
-    await tester.pumpAndSettle();
-
-    expect(find.text('订单确认'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey<String>('payment-method-wechat')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey<String>('order-confirm-pay')));
     await tester.pumpAndSettle();
 
     expect(find.text('当前还没有待付款的订单'), findsOneWidget);
@@ -776,12 +883,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('待发货'), findsWidgets);
 
-    // 首次支付宝失败和补付微信成功各自收到一笔请求。
-    final PaymentRequest alipayRequest = _capturedPayRequest(alipayGateway);
-    expect(alipayRequest.orderId, 'ORD-0000001');
-    final PaymentRequest wechatRequest = _capturedPayRequest(wechatGateway);
-    expect(wechatRequest.orderId, 'ORD-0000001');
-    expect(wechatRequest.method, PaymentMethod.wechatPay);
+    // 继续支付请求仍指向同一笔待付款订单。
+    final PaymentRequest request = _capturedPayRequest(alipayGateway);
+    expect(request.orderId, 'ORD-0000001');
   });
 
   testWidgets('购物车提交订单前会先进入订单确认页并展示地址栏', (WidgetTester tester) async {
@@ -1066,32 +1170,67 @@ void main() {
     expect(find.text('购物车还是空的'), findsOneWidget);
   });
 
-  testWidgets('订单记录页可以推进订单状态并同步到我的页面', (WidgetTester tester) async {
-    await tester.pumpWidget(_buildTestApp(loggedIn: true));
-
-    await _submitFirstOrder(tester);
+  testWidgets('待收货订单可以确认收货并同步到我的页面', (WidgetTester tester) async {
+    await tester.pumpWidget(_buildTestApp(
+      loggedIn: true,
+      seedOrders: <OrderVO>[
+        buildTestOrderVO(
+          3002,
+          'ORD-0000002',
+          status: OrderStatus.pendingDelivery,
+        ),
+      ],
+    ));
 
     await _switchToProfileTab(tester);
     await tester.tap(
-      find.byKey(const ValueKey<String>('profile-order-status-待发货')),
+      find.byKey(const ValueKey<String>('profile-order-status-待收货')),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('当前筛选：待发货'), findsOneWidget);
-    expect(find.text('下一步: 待收货'), findsOneWidget);
-
+    expect(find.text('当前筛选：待收货'), findsOneWidget);
     await tester.tap(
-      find.byKey(const ValueKey<String>('order-advance-ORD-0000001')),
+      find.byKey(const ValueKey<String>('order-confirm-ORD-0000002')),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('当前还没有待发货的订单'), findsOneWidget);
+    expect(find.text('已确认收货'), findsOneWidget);
+    expect(find.text('当前还没有待收货的订单'), findsOneWidget);
 
     await tester.pageBack();
     await tester.pumpAndSettle();
+    expect(find.text('已完成'), findsWidgets);
+  });
 
-    expect(find.text('待收货'), findsWidgets);
-    expect(find.text('订单状态'), findsWidgets);
+  testWidgets('待付款订单可以取消并同步到我的页面', (WidgetTester tester) async {
+    await tester.pumpWidget(_buildTestApp(
+      loggedIn: true,
+      seedOrders: <OrderVO>[
+        buildTestOrderVO(
+          3003,
+          'ORD-0000003',
+          status: OrderStatus.pendingPayment,
+        ),
+      ],
+    ));
+
+    await _switchToProfileTab(tester);
+    await tester.tap(
+      find.byKey(const ValueKey<String>('profile-order-status-待付款')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('order-cancel-ORD-0000003')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('订单已取消'), findsOneWidget);
+    expect(find.text('当前还没有待付款的订单'), findsOneWidget);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('已取消'), findsWidgets);
   });
 
   testWidgets('点击订单记录卡片后会进入订单详情页', (WidgetTester tester) async {
