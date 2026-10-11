@@ -1,9 +1,8 @@
-import 'package:my_first_app/features/product/data/models/product_summary.dart';
-
-/// 购物车条目。
+/// 旧版购物车条目（本地桥接模型）。
 ///
-/// 当前阶段先把它做成一个很轻量的数据对象，
-/// 负责保存“加入购物车后，购物车页真正需要展示什么”。
+/// 购物车数据已切换为服务端 `CartItemVO`，本模型只保留一个用途：
+/// 作为 `CartNotifier.selectedItems` 到订单确认页的桥接入参，
+/// 订单域对接后端接口后会被整体替换。
 class CartItem {
   final String name;
   final String priceLabel;
@@ -16,18 +15,6 @@ class CartItem {
     required this.unitPrice,
     this.quantity = 1,
   });
-
-  /// 直接从商品摘要生成购物车条目，
-  /// 金额取商品最低价并向下取整，保持展示与计算一致。
-  factory CartItem.fromProductSummary(ProductSummary product) {
-    final int unitPrice = product.minPrice.truncate();
-
-    return CartItem(
-      name: product.name,
-      priceLabel: '¥$unitPrice',
-      unitPrice: unitPrice,
-    );
-  }
 
   CartItem copyWith({int? quantity}) {
     return CartItem(
@@ -42,3 +29,4 @@ class CartItem {
 
   String get totalPriceLabel => '¥$totalPrice';
 }
+

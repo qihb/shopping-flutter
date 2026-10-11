@@ -5,7 +5,12 @@ import 'package:provider/provider.dart';
 
 import 'package:my_first_app/app/presentation/pages/main_tab_page.dart';
 import 'package:my_first_app/features/auth/application/auth_notifier.dart';
+import 'package:my_first_app/features/auth/data/models/user_info.dart';
+import 'package:my_first_app/features/auth/presentation/pages/login_page.dart';
 import 'package:my_first_app/features/cart/application/cart_notifier.dart';
+import 'package:my_first_app/features/cart/data/models/cart_item_vo.dart';
+import 'package:my_first_app/features/cart/data/models/cart_vo.dart';
+import 'package:my_first_app/features/cart/presentation/pages/cart_page.dart';
 import 'package:my_first_app/features/order/application/order_notifier.dart';
 import 'package:my_first_app/features/payment/application/payment_gateway.dart';
 import 'package:my_first_app/features/payment/application/payment_service.dart';
@@ -15,6 +20,7 @@ import 'package:my_first_app/features/payment/presentation/models/payment_result
 import 'package:my_first_app/features/product/data/models/category_node.dart';
 import 'package:my_first_app/features/product/data/models/page_result.dart';
 import 'package:my_first_app/features/product/data/models/product_detail.dart';
+import 'package:my_first_app/features/product/data/models/product_sku.dart';
 import 'package:my_first_app/features/product/data/models/product_summary.dart';
 import 'package:my_first_app/features/profile/application/address_notifier.dart';
 import 'package:my_first_app/features/profile/application/settings_notifier.dart';
@@ -22,11 +28,57 @@ import 'package:my_first_app/features/profile/presentation/models/user_address.d
 import '../../../helpers/mocks.mocks.dart';
 import '../../../helpers/stub_helpers.dart';
 
+/// 测试用 SKU 目录：skuId → (商品名, 单价)。
+///
+/// 购物车走服务端接口后，加购请求只携带 skuId，
+/// 模拟服务端时需要这张表反查条目的商品名与单价。
+const Map<int, (String, double)> _skuCatalog = <int, (String, double)>{
+  9001: ('夏季轻运动鞋', 89),
+  9002: ('极简双肩包', 129),
+  9101: ('男装夹克', 199),
+  9102: ('基础款T恤', 99),
+  9201: ('轻弹跑鞋', 299),
+  9202: ('城市通勤板鞋', 269),
+};
+
+/// 构造一个测试 SKU：规格统一展示「默认规格」，划线价为 0。
+ProductSku _buildSku(int id, double price) {
+  return ProductSku(
+    id: id,
+    skuCode: 'SKU-$id',
+    specs: '默认规格',
+    price: price,
+    originalPrice: 0,
+    stock: 50,
+    status: 1,
+  );
+}
+
 /// 创建默认未登录的登录态管理：token 存取走 Mock，restoreSession 后处于未登录态。
 AuthNotifier _buildAuthNotifier() {
   final MockAuthService authService = MockAuthService();
   final MockTokenStore tokenStore = MockTokenStore();
   when(tokenStore.readToken()).thenAnswer((_) async => null);
+  return AuthNotifier(
+    authService: authService,
+    tokenStore: tokenStore,
+  )..restoreSession();
+}
+
+/// 创建已登录的登录态管理：本地 token 有效，/api/user/me 返回固定用户。
+AuthNotifier _buildLoggedInAuthNotifier() {
+  final MockAuthService authService = MockAuthService();
+  final MockTokenStore tokenStore = MockTokenStore();
+  when(tokenStore.readToken()).thenAnswer((_) async => 'test-token');
+  when(authService.fetchCurrentUser()).thenAnswer(
+    (_) async => const UserInfo(
+      id: 1,
+      username: 'tester',
+      nickname: '测试用户',
+      phone: '13800000000',
+    ),
+  );
+
   return AuthNotifier(
     authService: authService,
     tokenStore: tokenStore,
@@ -111,19 +163,134 @@ MockProductService _buildProductService() {
   when(service.fetchCategoryTree())
       .thenAnswer((_) async => _buildCategoryTree());
 
-  // 商品详情按 id 返回对应数据。
+  // 商品详情按 id 返回对应数据。每个商品都带一个 SKU，
+  // 详情页默认选中第一个 SKU，加购回调携带该 skuId。
   when(service.fetchProductDetail(any))
       .thenAnswer((Invocation invocation) async {
     final int id = invocation.positionalArguments.first as int;
     final Map<int, ProductDetail> details = <int, ProductDetail>{
-      1: buildTestProductDetail(1, '夏季轻运动鞋', minPrice: 89),
-      2: buildTestProductDetail(2, '极简双肩包', minPrice: 129),
-      101: buildTestProductDetail(101, '男装夹克', minPrice: 199),
-      102: buildTestProductDetail(102, '基础款T恤', minPrice: 99),
-      201: buildTestProductDetail(201, '轻弹跑鞋', minPrice: 299),
-      202: buildTestProductDetail(202, '城市通勤板鞋', minPrice: 269),
+      1: buildTestProductDetail(1, '夏季轻运动鞋', minPrice: 89,
+          skus: <ProductSku>[_buildSku(9001, 89)]),
+      2: buildTestProductDetail(2, '极简双肩包', minPrice: 129,
+          skus: <ProductSku>[_buildSku(9002, 129)]),
+      101: buildTestProductDetail(101, '男装夹克', minPrice: 199,
+          skus: <ProductSku>[_buildSku(9101, 199)]),
+      102: buildTestProductDetail(102, '基础款T恤', minPrice: 99,
+          skus: <ProductSku>[_buildSku(9102, 99)]),
+      201: buildTestProductDetail(201, '轻弹跑鞋', minPrice: 299,
+          skus: <ProductSku>[_buildSku(9201, 299)]),
+      202: buildTestProductDetail(202, '城市通勤板鞋', minPrice: 269,
+          skus: <ProductSku>[_buildSku(9202, 269)]),
     };
     return details[id] ?? buildTestProductDetail(id, '未配置的测试商品');
+  });
+
+  return service;
+}
+
+/// 创建带本地可变快照的购物车服务，模拟服务端购物车行为。
+///
+/// 与真实服务端的交互顺序保持一致：变更接口只改服务端数据不返回列表，
+/// `CartNotifier` 每次变更后重新调用 [MockCartService.fetchCart] 读回最新状态。
+MockCartService _buildCartService() {
+  final MockCartService service = MockCartService();
+
+  // 服务端当前的购物车条目快照，所有变更都作用在它上面。
+  List<CartItemVO> items = <CartItemVO>[];
+
+  CartVO currentCart() => buildTestCart(items);
+
+  when(service.fetchCart()).thenAnswer((_) async => currentCart());
+
+  when(service.addItem(
+    skuId: anyNamed('skuId'),
+    quantity: anyNamed('quantity'),
+  )).thenAnswer((Invocation invocation) async {
+    final int skuId = invocation.namedArguments[#skuId] as int;
+    final int quantity = invocation.namedArguments[#quantity] as int;
+    // 记录（record）模式解构目录数据，未登记的 SKU 用兜底信息。
+    final (String productName, double price) =
+        _skuCatalog[skuId] ?? ('测试商品', 99.0);
+
+    final int existingIndex =
+        items.indexWhere((CartItemVO item) => item.skuId == skuId);
+
+    if (existingIndex >= 0) {
+      // 同一 SKU 再次加购：合并数量并重算小计。
+      final CartItemVO existing = items[existingIndex];
+      final int newQuantity = existing.quantity + quantity;
+      items[existingIndex] = existing.copyWith(
+        quantity: newQuantity,
+        subtotal: existing.price * newQuantity,
+      );
+      return;
+    }
+
+    items = <CartItemVO>[
+      ...items,
+      buildTestCartItem(
+        items.length + 1,
+        productName,
+        skuId: skuId,
+        productId: skuId % 1000,
+        price: price,
+        quantity: quantity,
+      ),
+    ];
+  });
+
+  when(service.updateQuantity(
+    itemId: anyNamed('itemId'),
+    quantity: anyNamed('quantity'),
+  )).thenAnswer((Invocation invocation) async {
+    final int itemId = invocation.namedArguments[#itemId] as int;
+    final int quantity = invocation.namedArguments[#quantity] as int;
+
+    items = items
+        .map((CartItemVO item) => item.id == itemId
+            ? item.copyWith(quantity: quantity, subtotal: item.price * quantity)
+            : item)
+        .toList();
+  });
+
+  when(service.removeItem(any)).thenAnswer((Invocation invocation) async {
+    final int itemId = invocation.positionalArguments.first as int;
+    items = items.where((CartItemVO item) => item.id != itemId).toList();
+  });
+
+  when(service.setItemChecked(
+    itemId: anyNamed('itemId'),
+    checked: anyNamed('checked'),
+  )).thenAnswer((Invocation invocation) async {
+    final int itemId = invocation.namedArguments[#itemId] as int;
+    final bool checked = invocation.namedArguments[#checked] as bool;
+
+    items = items
+        .map((CartItemVO item) =>
+            item.id == itemId ? item.copyWith(checked: checked) : item)
+        .toList();
+  });
+
+  when(service.setAllChecked(checked: anyNamed('checked')))
+      .thenAnswer((Invocation invocation) async {
+    final bool checked = invocation.namedArguments[#checked] as bool;
+
+    // 失效条目不可勾选，与服务端口径一致。
+    items = items
+        .map((CartItemVO item) =>
+            item.invalid ? item : item.copyWith(checked: checked))
+        .toList();
+  });
+
+  when(service.removeCheckedItems()).thenAnswer((_) async {
+    // 与服务端语义一致：只移除「已勾选且有效」的条目。
+    items = items
+        .where((CartItemVO item) => item.invalid || !item.checked)
+        .toList();
+  });
+
+  when(service.clearCart()).thenAnswer((_) async {
+    items = <CartItemVO>[];
   });
 
   return service;
@@ -171,9 +338,14 @@ PaymentRequest _capturedPayRequest(MockPaymentGateway gateway) {
 ///
 /// `MainTabPage` 通过 Provider 树间接获取状态，
 /// 测试时需要把各个 Notifier 注入进去。
+/// [loggedIn] 为 true 时构造已登录态，购物车相关链路都依赖登录。
 Widget _buildTestApp({
+  bool loggedIn = false,
   PaymentService? paymentService,
 }) {
+  final AuthNotifier authNotifier =
+      loggedIn ? _buildLoggedInAuthNotifier() : _buildAuthNotifier();
+  final MockCartService cartService = _buildCartService();
   final PaymentService service = paymentService ??
       PaymentService(
         gateways: <PaymentMethod, PaymentGateway>{
@@ -184,10 +356,11 @@ Widget _buildTestApp({
 
   return MultiProvider(
     providers: [
-      ChangeNotifierProvider<AuthNotifier>(
-        create: (_) => _buildAuthNotifier(),
+      ChangeNotifierProvider<AuthNotifier>.value(value: authNotifier),
+      ChangeNotifierProvider<CartNotifier>(
+        create: (_) => CartNotifier(cartService: cartService)
+          ..attachAuth(authNotifier),
       ),
-      ChangeNotifierProvider<CartNotifier>(create: (_) => CartNotifier()),
       ChangeNotifierProvider<OrderNotifier>(
         create: (_) => OrderNotifier(paymentService: service),
       ),
@@ -220,6 +393,15 @@ Widget _buildTestApp({
   );
 }
 
+/// 限定在购物车页子树内查找。
+///
+/// MainTabPage 用 IndexedStack 承载四个 tab，首页商品卡片与
+/// 购物车条目可能同名，断言必须限定作用域才能避免歧义。
+Finder _inCartPage(Finder finder) => find.descendant(
+      of: find.byType(CartPage),
+      matching: finder,
+    );
+
 Future<void> _addProductToCart(
   WidgetTester tester, {
   String productName = '夏季轻运动鞋',
@@ -239,7 +421,9 @@ Future<void> _addProductToCart(
   await tester.scrollUntilVisible(
     find.text('加入购物车'),
     200,
-    scrollable: find.byType(Scrollable).last,
+    // 详情页主滚动视图是树中第一个 Scrollable；
+    // 配置了 SKU 时末尾的 Scrollable 是 SKU 横滑列表，垂直拖拽无效。
+    scrollable: find.byType(Scrollable).first,
   );
   await tester.pumpAndSettle();
 
@@ -302,35 +486,57 @@ void main() {
     expect(find.text('城市通勤板鞋'), findsOneWidget);
   });
 
-  testWidgets('从商品详情加入购物车后会在购物车页看到对应商品', (WidgetTester tester) async {
+  testWidgets('未登录点击加入购物车会引导到登录页', (WidgetTester tester) async {
     await tester.pumpWidget(_buildTestApp());
 
     await _addProductToCart(tester);
 
-    expect(find.text('夏季轻运动鞋'), findsOneWidget);
-    expect(find.text('¥89'), findsWidgets);
-    expect(find.text('合计 ¥89'), findsOneWidget);
+    // 游客没有服务端购物车，加购统一跳登录页，详情页保留在栈里。
+    expect(find.byType(LoginPage), findsOneWidget);
+    // 购物车为空时角标不渲染。
+    expect(find.byKey(const ValueKey<String>('cart-tab-badge')), findsNothing);
   });
 
-  testWidgets('购物车里修改商品数量后会同步更新数量和合计金额', (WidgetTester tester) async {
-    await tester.pumpWidget(_buildTestApp());
+  testWidgets('从商品详情加入购物车后会在购物车页看到对应商品', (WidgetTester tester) async {
+    await tester.pumpWidget(_buildTestApp(loggedIn: true));
+
+    await _addProductToCart(tester);
+
+    expect(_inCartPage(find.text('夏季轻运动鞋')), findsOneWidget);
+    expect(_inCartPage(find.text('¥89')), findsOneWidget);
+    expect(find.text('购物车共 1 件'), findsOneWidget);
+    expect(find.text('合计 ¥89'), findsOneWidget);
+    expect(find.text('已勾选 1 件'), findsOneWidget);
+  });
+
+  testWidgets('购物车里修改商品数量后会同步更新数量、合计金额与角标', (WidgetTester tester) async {
+    await tester.pumpWidget(_buildTestApp(loggedIn: true));
 
     await _addProductToCart(tester);
 
     await tester.tap(
-      find.byKey(const ValueKey<String>('cart-increase-夏季轻运动鞋')),
+      find.byKey(const ValueKey<String>('cart-increase-1')),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('数量 x2'), findsOneWidget);
+    expect(_inCartPage(find.text('2')), findsOneWidget);
+    expect(find.text('购物车共 2 件'), findsOneWidget);
     expect(find.text('合计 ¥178'), findsOneWidget);
+    expect(find.text('已勾选 2 件'), findsOneWidget);
+    // 底部导航角标用服务端总件数。
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey<String>('cart-tab-badge')),
+        matching: find.text('2'),
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(
-      find.byKey(const ValueKey<String>('cart-decrease-夏季轻运动鞋')),
+      find.byKey(const ValueKey<String>('cart-decrease-1')),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('数量 x1'), findsOneWidget);
     expect(find.text('合计 ¥89'), findsOneWidget);
   });
 
@@ -352,6 +558,7 @@ void main() {
 
     await tester.pumpWidget(
       _buildTestApp(
+        loggedIn: true,
         paymentService: PaymentService(
           gateways: <PaymentMethod, PaymentGateway>{
             PaymentMethod.alipay: alipayGateway,
@@ -387,6 +594,7 @@ void main() {
 
     await tester.pumpWidget(
       _buildTestApp(
+        loggedIn: true,
         paymentService: PaymentService(
           gateways: <PaymentMethod, PaymentGateway>{
             PaymentMethod.alipay: alipayGateway,
@@ -430,6 +638,7 @@ void main() {
 
     await tester.pumpWidget(
       _buildTestApp(
+        loggedIn: true,
         paymentService: PaymentService(
           gateways: <PaymentMethod, PaymentGateway>{
             PaymentMethod.alipay: alipayGateway,
@@ -476,7 +685,7 @@ void main() {
   });
 
   testWidgets('购物车提交订单前会先进入订单确认页并展示地址栏', (WidgetTester tester) async {
-    await tester.pumpWidget(_buildTestApp());
+    await tester.pumpWidget(_buildTestApp(loggedIn: true));
 
     await _addProductToCart(tester);
     await tester.pump(const Duration(milliseconds: 1500));
@@ -537,7 +746,7 @@ void main() {
   });
 
   testWidgets('修改默认地址后订单确认页会展示新的收货地址', (WidgetTester tester) async {
-    await tester.pumpWidget(_buildTestApp());
+    await tester.pumpWidget(_buildTestApp(loggedIn: true));
 
     await tester.tap(find.text('我的'));
     await tester.pumpAndSettle();
@@ -577,7 +786,7 @@ void main() {
   });
 
   testWidgets('点击每个订单状态后都会跳转到订单记录页', (WidgetTester tester) async {
-    await tester.pumpWidget(_buildTestApp());
+    await tester.pumpWidget(_buildTestApp(loggedIn: true));
 
     await _submitFirstOrder(tester);
 
@@ -599,7 +808,7 @@ void main() {
   });
 
   testWidgets('从分类页进入详情并加入购物车后会在购物车看到商品', (WidgetTester tester) async {
-    await tester.pumpWidget(_buildTestApp());
+    await tester.pumpWidget(_buildTestApp(loggedIn: true));
 
     await tester.tap(find.text('分类'));
     await tester.pumpAndSettle();
@@ -623,7 +832,8 @@ void main() {
     await tester.scrollUntilVisible(
       find.text('加入购物车'),
       200,
-      scrollable: find.byType(Scrollable).last,
+      // 详情页主滚动视图是第一个 Scrollable，SKU 横滑列表在末尾。
+      scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
 
@@ -632,22 +842,25 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('轻弹跑鞋'), findsOneWidget);
+    expect(_inCartPage(find.text('轻弹跑鞋')), findsOneWidget);
     expect(find.text('合计 ¥299'), findsOneWidget);
   });
 
   testWidgets('加入购物车后会显示提示并更新购物车角标', (WidgetTester tester) async {
-    await tester.pumpWidget(_buildTestApp());
+    await tester.pumpWidget(_buildTestApp(loggedIn: true));
 
     await _addProductToCart(tester);
 
     expect(find.text('已加入购物车：夏季轻运动鞋'), findsOneWidget);
     expect(find.byKey(const ValueKey<String>('cart-tab-badge')), findsOneWidget);
     expect(find.text('1'), findsWidgets);
+
+    // 让加购提示的 SnackBar 计时器走完，避免测试结束时残留 Timer。
+    await tester.pump(const Duration(seconds: 2));
   });
 
   testWidgets('购物车支持删除单个商品和一键清空', (WidgetTester tester) async {
-    await tester.pumpWidget(_buildTestApp());
+    await tester.pumpWidget(_buildTestApp(loggedIn: true));
 
     await _addProductToCart(tester, productName: '夏季轻运动鞋');
     await tester.pump(const Duration(milliseconds: 1500));
@@ -671,7 +884,8 @@ void main() {
     await tester.scrollUntilVisible(
       find.text('加入购物车'),
       200,
-      scrollable: find.byType(Scrollable).last,
+      // 详情页主滚动视图是第一个 Scrollable，SKU 横滑列表在末尾。
+      scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
     await tester.tap(
@@ -679,16 +893,16 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('夏季轻运动鞋'), findsOneWidget);
-    expect(find.text('轻弹跑鞋'), findsOneWidget);
+    expect(_inCartPage(find.text('夏季轻运动鞋')), findsOneWidget);
+    expect(_inCartPage(find.text('轻弹跑鞋')), findsOneWidget);
 
     await tester.tap(
-      find.byKey(const ValueKey<String>('cart-delete-夏季轻运动鞋')),
+      find.byKey(const ValueKey<String>('cart-delete-1')),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('夏季轻运动鞋'), findsNothing);
-    expect(find.text('轻弹跑鞋'), findsOneWidget);
+    expect(_inCartPage(find.text('夏季轻运动鞋')), findsNothing);
+    expect(_inCartPage(find.text('轻弹跑鞋')), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey<String>('cart-clear-all')));
     await tester.pumpAndSettle();
@@ -697,7 +911,7 @@ void main() {
   });
 
   testWidgets('订单记录页可以推进订单状态并同步到我的页面', (WidgetTester tester) async {
-    await tester.pumpWidget(_buildTestApp());
+    await tester.pumpWidget(_buildTestApp(loggedIn: true));
 
     await _submitFirstOrder(tester);
 
@@ -725,7 +939,7 @@ void main() {
   });
 
   testWidgets('点击订单记录卡片后会进入订单详情页', (WidgetTester tester) async {
-    await tester.pumpWidget(_buildTestApp());
+    await tester.pumpWidget(_buildTestApp(loggedIn: true));
 
     await _submitFirstOrder(tester);
 

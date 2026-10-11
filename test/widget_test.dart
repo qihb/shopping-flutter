@@ -140,8 +140,9 @@ void main() {
 
     await tester.tap(find.text('购物车'));
     await tester.pumpAndSettle();
-    expect(find.text('购物车还是空的'), findsOneWidget);
-    expect(find.text('先去首页挑一件喜欢的商品吧'), findsOneWidget);
+    // 购物车已服务端化：游客态展示登录引导，不再渲染本地购物车。
+    expect(find.text('登录后查看购物车'), findsOneWidget);
+    expect(find.text('登录后即可同步你的购物车商品'), findsOneWidget);
 
     await tester.tap(find.text('我的'));
     await tester.pumpAndSettle();

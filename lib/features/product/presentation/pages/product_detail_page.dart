@@ -18,7 +18,16 @@ class ProductDetailPage extends StatefulWidget {
 
   /// 可选注入的商品服务，主要用于测试；为 null 时懒创建真实实例。
   final ProductService? productService;
-  final ValueChanged<ProductSummary>? onAddToCart;
+
+  /// 加购回调：携带当前选中的 SKU。
+  ///
+  /// 服务端加购请求（`CartAddRequest`）按 SKU 维度提交，
+  /// 没有选中 SKU（如商品未配置规格）时 `sku` 为 null，由上层编排提示。
+  ///
+  /// 返回 `true` 表示上层已经完成了页面导航（例如未登录时跳转登录页），
+  /// 此时详情页应保留在栈里，登录后返回可再次加购；
+  /// 返回 `false` 表示没有发生导航，详情页自行退出。
+  final bool Function(ProductSummary product, ProductSku? sku)? onAddToCart;
 
   const ProductDetailPage({
     super.key,
@@ -110,8 +119,14 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   void _handleAddToCart() {
-    widget.onAddToCart?.call(_summaryFromDetail);
-    Navigator.of(context).pop();
+    // 上层跳了登录页时返回 true，此时详情页不能 pop，
+    // 否则会把刚压栈的登录页顶出栈，登录引导就失效了。
+    final bool didNavigate =
+        widget.onAddToCart?.call(_summaryFromDetail, _selectedSku) ?? false;
+
+    if (!didNavigate) {
+      Navigator.of(context).pop();
+    }
   }
 
   /// 轮播图片地址：优先用商品图集，没有图集时回退主图。

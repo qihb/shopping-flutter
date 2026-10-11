@@ -9,6 +9,7 @@ import 'package:my_first_app/features/auth/application/auth_notifier.dart';
 import 'package:my_first_app/features/auth/data/auth_service.dart';
 import 'package:my_first_app/features/auth/data/token_store.dart';
 import 'package:my_first_app/features/cart/application/cart_notifier.dart';
+import 'package:my_first_app/features/cart/data/cart_service.dart';
 import 'package:my_first_app/features/order/application/order_notifier.dart';
 import 'package:my_first_app/features/payment/application/payment_service_factory.dart';
 import 'package:my_first_app/features/product/data/product_service.dart';
@@ -31,7 +32,15 @@ class MyApp extends StatelessWidget {
   /// 可选注入的登录态 Notifier，主要用于测试时替换真实网络实现。
   final AuthNotifier? authNotifier;
 
-  const MyApp({super.key, this.productService, this.authNotifier});
+  /// 可选注入的购物车 Notifier，主要用于测试时替换服务端购物车实现。
+  final CartNotifier? cartNotifier;
+
+  const MyApp({
+    super.key,
+    this.productService,
+    this.authNotifier,
+    this.cartNotifier,
+  });
 
   /// 创建真实环境的登录态管理。
   ///
@@ -69,6 +78,19 @@ class MyApp extends StatelessWidget {
     );
   }
 
+  /// 创建真实环境的购物车状态管理。
+  ///
+  /// 购物车接口需要登录态，所以这里的 [ApiClient] 与认证模块一样
+  /// 携带 tokenProvider，每次请求前从本地存储读取最新 token 注入请求头。
+  CartNotifier _createCartNotifier() {
+    final ApiClient apiClient = ApiClient(
+      baseUrl: AppConfigStore.instance.apiBaseUrl,
+      tokenProvider: SharedPrefsTokenStore().readToken,
+    );
+
+    return CartNotifier(cartService: CartService(apiClient: apiClient));
+  }
+
   @override
   Widget build(BuildContext context) {
     final appConfig = AppConfigStore.instance;
@@ -79,7 +101,12 @@ class MyApp extends StatelessWidget {
           create: (_) => authNotifier ?? _createAuthNotifier(),
         ),
         ChangeNotifierProvider<CartNotifier>(
-          create: (_) => CartNotifier(),
+          create: (context) {
+            final CartNotifier notifier = cartNotifier ?? _createCartNotifier();
+            // 登录 / 退出时自动拉取或清空购物车，无需页面手动编排。
+            notifier.attachAuth(context.read<AuthNotifier>());
+            return notifier;
+          },
         ),
         ChangeNotifierProvider<OrderNotifier>(
           create: (_) => OrderNotifier(

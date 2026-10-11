@@ -4,6 +4,7 @@ import 'package:my_first_app/app/config/app_config_store.dart';
 import 'package:my_first_app/core/api/api_client.dart';
 import 'package:my_first_app/features/product/data/models/category_node.dart';
 import 'package:my_first_app/features/product/data/models/page_result.dart';
+import 'package:my_first_app/features/product/data/models/product_sku.dart';
 import 'package:my_first_app/features/product/data/models/product_summary.dart';
 import 'package:my_first_app/features/product/data/product_service.dart';
 import 'package:my_first_app/features/product/presentation/pages/product_detail_page.dart';
@@ -20,7 +21,10 @@ class CategoryPage extends StatefulWidget {
   /// 承接“从首页点击某个分类后，分类页默认选中哪个一级分类”，
   /// 等价于进入页面时携带的初始筛选条件。
   final int? initialCategoryId;
-  final ValueChanged<ProductSummary>? onAddToCart;
+
+  /// 加购回调透传到商品详情页，携带详情页当前选中的 SKU；
+  /// 返回值语义见 [ProductDetailPage.onAddToCart]。
+  final bool Function(ProductSummary product, ProductSku? sku)? onAddToCart;
 
   /// 可选注入的商品服务，主要用于测试；为 null 时懒创建真实实例。
   final ProductService? productService;

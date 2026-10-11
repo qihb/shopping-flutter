@@ -1,91 +1,261 @@
 import 'package:flutter/foundation.dart';
 
+import 'package:my_first_app/core/api/api_exception.dart';
+import 'package:my_first_app/features/auth/application/auth_notifier.dart';
+import 'package:my_first_app/features/cart/data/cart_service.dart';
+import 'package:my_first_app/features/cart/data/models/cart_item_vo.dart';
+import 'package:my_first_app/features/cart/data/models/cart_vo.dart';
 import 'package:my_first_app/features/cart/presentation/models/cart_item.dart';
-import 'package:my_first_app/features/product/data/models/product_summary.dart';
 
-/// 购物车状态管理。
+/// 购物车状态管理（服务端化版本）。
 ///
-/// `ChangeNotifier` 是 Flutter 里最基础的可监听状态容器：
-/// - 内部数据变化时调用 `notifyListeners()`
-/// - 外部的 `context.watch<CartNotifier>()` 会自动触发 UI 重建
+/// 与旧版本地购物车的区别：
+/// - 数据源是 spring-shop 的 `/api/cart` 系列接口，所有操作都走服务端
+/// - 登录态变化（[AuthNotifier]）自动联动：登录后拉取、退出后清空
+/// - 变更接口只返回成功与否，每次变更后重新拉取购物车刷新列表与汇总
 ///
-/// 把它从 `MainTabPage` 拆出来以后，购物车相关的逻辑不再散落在主页面里，
-/// 其他页面也只需要 `context.read<CartNotifier>()` 就能操作购物车。
+/// 依旧沿用项目约定的 `ChangeNotifier` + `provider` 方案：
+/// 页面通过 `context.watch<CartNotifier>()` 重建，
+/// 通过 `context.read<CartNotifier>()` 触发操作。
 class CartNotifier extends ChangeNotifier {
-  final List<CartItem> _items = <CartItem>[];
+  final CartService _cartService;
 
-  /// 购物车商品列表（不可变视图）。
-  List<CartItem> get items => List<CartItem>.unmodifiable(_items);
+  /// 关联的登录态，用于监听登录 / 退出并联动购物车数据。
+  AuthNotifier? _authNotifier;
 
-  /// 购物车商品总件数。
-  int get itemCount => _items.fold<int>(0, (sum, item) => sum + item.quantity);
+  CartVO? _cart;
+  bool _isLoading = false;
+  String? _errorMessage;
 
-  /// 购物车总价。
-  int get totalPrice => _items.fold<int>(0, (sum, item) => sum + item.totalPrice);
+  CartNotifier({required this._cartService});
 
-  /// 是否为空。
-  bool get isEmpty => _items.isEmpty;
+  /// 当前购物车数据，未登录或未加载时为 null。
+  CartVO? get cart => _cart;
 
-  /// 从商品详情 / 首页推荐商品加入购物车。
+  /// 购物车条目列表（不可变视图）。
+  List<CartItemVO> get items => _cart?.items ?? const <CartItemVO>[];
+
+  /// 购物车总件数（含未勾选与失效条目），底部导航角标用它。
+  int get totalQuantity => _cart?.totalQuantity ?? 0;
+
+  /// 已勾选件数（仅有效条目）。
+  int get checkedQuantity => _cart?.checkedQuantity ?? 0;
+
+  /// 已勾选金额合计（仅有效条目），由服务端计算。
+  double get checkedAmount => _cart?.checkedAmount ?? 0;
+
+  /// 是否正在整页加载。
+  bool get isLoading => _isLoading;
+
+  /// 最近一次操作的错误提示；操作失败时由页面读取并弹出 SnackBar。
+  String? get errorMessage => _errorMessage;
+
+  /// 是否没有任何条目。
+  bool get isEmpty => _cart == null || _cart!.items.isEmpty;
+
+  /// 已勾选且有效的条目，映射成订单确认页当前使用的旧 [CartItem] 桥接模型。
   ///
-  /// 如果同名商品已存在，数量 +1；否则新增一条。
-  void addProduct(ProductSummary product) {
-    final int existingIndex = _items.indexWhere(
-      (item) => item.name == product.name,
-    );
+  /// 下单流程对接后端订单接口前，订单确认页仍以旧 `CartItem` 为入参，
+  /// 这里做一层映射完成过渡；订单域服务端化之后会整体替换。
+  List<CartItem> get selectedItems {
+    final CartVO? currentCart = _cart;
 
-    if (existingIndex >= 0) {
-      final CartItem existingItem = _items[existingIndex];
-      _items[existingIndex] = existingItem.copyWith(
-        quantity: existingItem.quantity + 1,
-      );
-    } else {
-      _items.add(CartItem.fromProductSummary(product));
+    if (currentCart == null) {
+      return const <CartItem>[];
     }
 
-    notifyListeners();
+    return currentCart.items
+        .where((CartItemVO item) => item.checked && !item.invalid)
+        .map(_toBridgeItem)
+        .toList(growable: false);
   }
 
-  /// 增加指定商品数量。
-  void increaseQuantity(CartItem item) {
-    final int index = _items.indexWhere((cartItem) => cartItem.name == item.name);
+  // ---------- 登录态联动 ----------
 
-    if (index < 0) {
+  /// 关联登录态并自动联动：
+  /// - 进入已登录 → 拉取服务端购物车
+  /// - 进入未登录 → 清空本地购物车数据
+  ///
+  /// 无论登录发生在哪个页面（登录页 / 个人中心），都通过监听
+  /// [AuthNotifier] 自动触发，页面不需要手动编排。
+  void attachAuth(AuthNotifier authNotifier) {
+    _authNotifier?.removeListener(_onAuthChanged);
+    _authNotifier = authNotifier;
+    _authNotifier!.addListener(_onAuthChanged);
+
+    // attach 时登录态可能已经确定（如测试先构造好登录态），立即对齐一次。
+    _syncWithAuthStatus();
+  }
+
+  @override
+  void dispose() {
+    _authNotifier?.removeListener(_onAuthChanged);
+    _authNotifier = null;
+    super.dispose();
+  }
+
+  void _onAuthChanged() {
+    _syncWithAuthStatus();
+  }
+
+  void _syncWithAuthStatus() {
+    final AuthNotifier? auth = _authNotifier;
+
+    if (auth == null) {
       return;
     }
 
-    _items[index] = _items[index].copyWith(quantity: _items[index].quantity + 1);
+    switch (auth.status) {
+      case AuthStatus.authenticated:
+        refresh();
+      case AuthStatus.unauthenticated:
+        _resetLocalState();
+      case AuthStatus.restoring:
+        // 会话恢复中不动作，等恢复结果出来后再联动。
+        break;
+    }
+  }
+
+  void _resetLocalState() {
+    _cart = null;
+    _isLoading = false;
+    _errorMessage = null;
     notifyListeners();
   }
 
-  /// 减少指定商品数量（最低保留 1）。
-  void decreaseQuantity(CartItem item) {
-    final int index = _items.indexWhere((cartItem) => cartItem.name == item.name);
+  // ---------- 读取 ----------
 
-    if (index < 0) {
+  /// 从服务端拉取购物车列表与汇总。
+  ///
+  /// [showLoading] 为 true 时整页展示加载态（进入页面 / 重试）；
+  /// 变更后的静默刷新传 false，避免列表闪烁。
+  Future<void> refresh({bool showLoading = true}) async {
+    // 购物车接口需要登录，未登录时直接清空本地数据，不发无效请求。
+    final bool isLoggedIn = _authNotifier?.isAuthenticated ?? true;
+
+    if (!isLoggedIn) {
+      _resetLocalState();
       return;
     }
 
-    final int nextQuantity = _items[index].quantity - 1;
-    _items[index] = _items[index].copyWith(
-      quantity: nextQuantity < 1 ? 1 : nextQuantity,
-    );
-    notifyListeners();
+    if (showLoading) {
+      _isLoading = true;
+      notifyListeners();
+    }
+
+    try {
+      final CartVO fetchedCart = await _cartService.fetchCart();
+      _cart = fetchedCart;
+      _errorMessage = null;
+    } catch (e) {
+      _errorMessage = _readableError(e, fallback: '购物车加载失败，请稍后重试');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
-  /// 从购物车中移除指定商品。
-  void removeItem(CartItem item) {
-    _items.removeWhere((cartItem) => cartItem.name == item.name);
-    notifyListeners();
+  // ---------- 变更 ----------
+
+  /// 加入购物车（SKU 维度）。
+  Future<bool> addToCart({required int skuId, int quantity = 1}) {
+    return _mutate(
+      () => _cartService.addItem(skuId: skuId, quantity: quantity),
+      fallbackMessage: '加入购物车失败，请稍后重试',
+    );
+  }
+
+  /// 修改条目购买数量。
+  Future<bool> updateQuantity({
+    required int itemId,
+    required int quantity,
+  }) {
+    return _mutate(
+      () => _cartService.updateQuantity(itemId: itemId, quantity: quantity),
+      fallbackMessage: '修改数量失败，请稍后重试',
+    );
+  }
+
+  /// 删除单条。
+  Future<bool> removeItem(int itemId) {
+    return _mutate(
+      () => _cartService.removeItem(itemId),
+      fallbackMessage: '删除商品失败，请稍后重试',
+    );
+  }
+
+  /// 单条勾选 / 取消勾选。
+  Future<bool> setItemChecked({
+    required int itemId,
+    required bool checked,
+  }) {
+    return _mutate(
+      () => _cartService.setItemChecked(itemId: itemId, checked: checked),
+      fallbackMessage: '操作失败，请稍后重试',
+    );
+  }
+
+  /// 全选 / 全不选。
+  Future<bool> setAllChecked({required bool checked}) {
+    return _mutate(
+      () => _cartService.setAllChecked(checked: checked),
+      fallbackMessage: '操作失败，请稍后重试',
+    );
+  }
+
+  /// 删除已勾选条目（下单成功后清理购物车）。
+  Future<bool> removeCheckedItems() {
+    return _mutate(
+      _cartService.removeCheckedItems,
+      fallbackMessage: '清理购物车失败，请稍后重试',
+    );
   }
 
   /// 清空购物车。
-  void clear() {
-    if (_items.isEmpty) {
-      return;
+  Future<bool> clearCart() {
+    return _mutate(_cartService.clearCart, fallbackMessage: '清空购物车失败，请稍后重试');
+  }
+
+  /// 执行一次服务端变更，成功后静默刷新购物车。
+  ///
+  /// 返回 true 表示变更成功；失败时把可读错误写入 [errorMessage]
+  /// 并返回 false，由调用方决定如何提示。
+  Future<bool> _mutate(
+    Future<void> Function() action, {
+    required String fallbackMessage,
+  }) async {
+    try {
+      await action();
+    } catch (e) {
+      _errorMessage = _readableError(e, fallback: fallbackMessage);
+      notifyListeners();
+      return false;
     }
 
-    _items.clear();
-    notifyListeners();
+    await refresh(showLoading: false);
+    return true;
+  }
+
+  /// 把异常转换成用户能看懂的提示，与 [AuthNotifier] 的策略一致。
+  String _readableError(Object error, {required String fallback}) {
+    if (error is ApiException) {
+      return error.message;
+    }
+
+    return fallback;
+  }
+
+  /// 服务端条目 → 订单确认页桥接模型。
+  ///
+  /// 金额沿用旧模型「向下取整」的处理，保证购物车页与订单确认页展示一致。
+  CartItem _toBridgeItem(CartItemVO item) {
+    final int unitPrice = item.price.truncate();
+
+    return CartItem(
+      name: item.productName,
+      priceLabel: '¥$unitPrice',
+      unitPrice: unitPrice,
+      quantity: item.quantity,
+    );
   }
 }
