@@ -4,33 +4,39 @@
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 
-import 'dart:async' as _i7;
-import 'dart:typed_data' as _i9;
+import 'dart:async' as _i8;
+import 'dart:typed_data' as _i10;
 
 import 'package:dio/src/adapter.dart' as _i2;
-import 'package:dio/src/options.dart' as _i8;
+import 'package:dio/src/options.dart' as _i9;
 import 'package:mockito/mockito.dart' as _i1;
-import 'package:mockito/src/dummies.dart' as _i11;
-import 'package:my_first_app/app/config/app_config.dart' as _i18;
-import 'package:my_first_app/features/auth/data/auth_service.dart' as _i12;
+import 'package:mockito/src/dummies.dart' as _i12;
+import 'package:my_first_app/app/config/app_config.dart' as _i21;
+import 'package:my_first_app/features/auth/data/auth_service.dart' as _i13;
 import 'package:my_first_app/features/auth/data/models/user_info.dart' as _i3;
-import 'package:my_first_app/features/auth/data/token_store.dart' as _i10;
-import 'package:my_first_app/features/home/data/home_recommend_service.dart'
-    as _i13;
-import 'package:my_first_app/features/home/presentation/models/home_recommend_product.dart'
-    as _i4;
+import 'package:my_first_app/features/auth/data/token_store.dart' as _i11;
 import 'package:my_first_app/features/payment/application/payment_gateway.dart'
-    as _i14;
-import 'package:my_first_app/features/payment/application/payment_order_provider.dart'
-    as _i16;
-import 'package:my_first_app/features/payment/application/payment_sdk_initializer.dart'
     as _i17;
+import 'package:my_first_app/features/payment/application/payment_order_provider.dart'
+    as _i19;
+import 'package:my_first_app/features/payment/application/payment_sdk_initializer.dart'
+    as _i20;
 import 'package:my_first_app/features/payment/data/models/alipay_payment_payload.dart'
-    as _i6;
+    as _i7;
 import 'package:my_first_app/features/payment/data/models/payment_request.dart'
-    as _i15;
+    as _i18;
 import 'package:my_first_app/features/payment/presentation/models/payment_result.dart'
+    as _i6;
+import 'package:my_first_app/features/product/data/models/category_node.dart'
+    as _i16;
+import 'package:my_first_app/features/product/data/models/page_result.dart'
+    as _i4;
+import 'package:my_first_app/features/product/data/models/product_detail.dart'
     as _i5;
+import 'package:my_first_app/features/product/data/models/product_summary.dart'
+    as _i15;
+import 'package:my_first_app/features/product/data/product_service.dart'
+    as _i14;
 
 // ignore_for_file: type=lint
 // ignore_for_file: avoid_redundant_argument_values
@@ -62,20 +68,24 @@ class _FakeUserInfo_2 extends _i1.SmartFake implements _i3.UserInfo {
     : super(parent, parentInvocation);
 }
 
-class _FakeHomeRecommendPageResult_3 extends _i1.SmartFake
-    implements _i4.HomeRecommendPageResult {
-  _FakeHomeRecommendPageResult_3(Object parent, Invocation parentInvocation)
+class _FakePageResult_3<T> extends _i1.SmartFake implements _i4.PageResult<T> {
+  _FakePageResult_3(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakePaymentResult_4 extends _i1.SmartFake implements _i5.PaymentResult {
-  _FakePaymentResult_4(Object parent, Invocation parentInvocation)
+class _FakeProductDetail_4 extends _i1.SmartFake implements _i5.ProductDetail {
+  _FakeProductDetail_4(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
-class _FakeAlipayPaymentPayload_5 extends _i1.SmartFake
-    implements _i6.AlipayPaymentPayload {
-  _FakeAlipayPaymentPayload_5(Object parent, Invocation parentInvocation)
+class _FakePaymentResult_5 extends _i1.SmartFake implements _i6.PaymentResult {
+  _FakePaymentResult_5(Object parent, Invocation parentInvocation)
+    : super(parent, parentInvocation);
+}
+
+class _FakeAlipayPaymentPayload_6 extends _i1.SmartFake
+    implements _i7.AlipayPaymentPayload {
+  _FakeAlipayPaymentPayload_6(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
@@ -84,14 +94,14 @@ class _FakeAlipayPaymentPayload_5 extends _i1.SmartFake
 /// See the documentation for Mockito's code generation for more information.
 class MockHttpClientAdapter extends _i1.Mock implements _i2.HttpClientAdapter {
   @override
-  _i7.Future<_i2.ResponseBody> fetch(
-    _i8.RequestOptions? options,
-    _i7.Stream<_i9.Uint8List>? requestStream,
-    _i7.Future<void>? cancelFuture,
+  _i8.Future<_i2.ResponseBody> fetch(
+    _i9.RequestOptions? options,
+    _i8.Stream<_i10.Uint8List>? requestStream,
+    _i8.Future<void>? cancelFuture,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#fetch, [options, requestStream, cancelFuture]),
-            returnValue: _i7.Future<_i2.ResponseBody>.value(
+            returnValue: _i8.Future<_i2.ResponseBody>.value(
               _FakeResponseBody_0(
                 this,
                 Invocation.method(#fetch, [
@@ -101,7 +111,7 @@ class MockHttpClientAdapter extends _i1.Mock implements _i2.HttpClientAdapter {
                 ]),
               ),
             ),
-            returnValueForMissingStub: _i7.Future<_i2.ResponseBody>.value(
+            returnValueForMissingStub: _i8.Future<_i2.ResponseBody>.value(
               _FakeResponseBody_0(
                 this,
                 Invocation.method(#fetch, [
@@ -112,7 +122,7 @@ class MockHttpClientAdapter extends _i1.Mock implements _i2.HttpClientAdapter {
               ),
             ),
           )
-          as _i7.Future<_i2.ResponseBody>);
+          as _i8.Future<_i2.ResponseBody>);
 
   @override
   void close({bool? force = false}) => super.noSuchMethod(
@@ -124,60 +134,60 @@ class MockHttpClientAdapter extends _i1.Mock implements _i2.HttpClientAdapter {
 /// A class which mocks [TokenStore].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockTokenStore extends _i1.Mock implements _i10.TokenStore {
+class MockTokenStore extends _i1.Mock implements _i11.TokenStore {
   @override
-  _i7.Future<String?> readToken() =>
+  _i8.Future<String?> readToken() =>
       (super.noSuchMethod(
             Invocation.method(#readToken, []),
-            returnValue: _i7.Future<String?>.value(),
-            returnValueForMissingStub: _i7.Future<String?>.value(),
+            returnValue: _i8.Future<String?>.value(),
+            returnValueForMissingStub: _i8.Future<String?>.value(),
           )
-          as _i7.Future<String?>);
+          as _i8.Future<String?>);
 
   @override
-  _i7.Future<void> saveToken(String? token) =>
+  _i8.Future<void> saveToken(String? token) =>
       (super.noSuchMethod(
             Invocation.method(#saveToken, [token]),
-            returnValue: _i7.Future<void>.value(),
-            returnValueForMissingStub: _i7.Future<void>.value(),
+            returnValue: _i8.Future<void>.value(),
+            returnValueForMissingStub: _i8.Future<void>.value(),
           )
-          as _i7.Future<void>);
+          as _i8.Future<void>);
 
   @override
-  _i7.Future<void> clearToken() =>
+  _i8.Future<void> clearToken() =>
       (super.noSuchMethod(
             Invocation.method(#clearToken, []),
-            returnValue: _i7.Future<void>.value(),
-            returnValueForMissingStub: _i7.Future<void>.value(),
+            returnValue: _i8.Future<void>.value(),
+            returnValueForMissingStub: _i8.Future<void>.value(),
           )
-          as _i7.Future<void>);
+          as _i8.Future<void>);
 
   @override
-  _i7.Future<String> readOrCreateClientId() =>
+  _i8.Future<String> readOrCreateClientId() =>
       (super.noSuchMethod(
             Invocation.method(#readOrCreateClientId, []),
-            returnValue: _i7.Future<String>.value(
-              _i11.dummyValue<String>(
+            returnValue: _i8.Future<String>.value(
+              _i12.dummyValue<String>(
                 this,
                 Invocation.method(#readOrCreateClientId, []),
               ),
             ),
-            returnValueForMissingStub: _i7.Future<String>.value(
-              _i11.dummyValue<String>(
+            returnValueForMissingStub: _i8.Future<String>.value(
+              _i12.dummyValue<String>(
                 this,
                 Invocation.method(#readOrCreateClientId, []),
               ),
             ),
           )
-          as _i7.Future<String>);
+          as _i8.Future<String>);
 }
 
 /// A class which mocks [AuthService].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockAuthService extends _i1.Mock implements _i12.AuthService {
+class MockAuthService extends _i1.Mock implements _i13.AuthService {
   @override
-  _i7.Future<_i3.LoginResult> login({
+  _i8.Future<_i3.LoginResult> login({
     required String? username,
     required String? password,
   }) =>
@@ -186,7 +196,7 @@ class MockAuthService extends _i1.Mock implements _i12.AuthService {
               #username: username,
               #password: password,
             }),
-            returnValue: _i7.Future<_i3.LoginResult>.value(
+            returnValue: _i8.Future<_i3.LoginResult>.value(
               _FakeLoginResult_1(
                 this,
                 Invocation.method(#login, [], {
@@ -195,7 +205,7 @@ class MockAuthService extends _i1.Mock implements _i12.AuthService {
                 }),
               ),
             ),
-            returnValueForMissingStub: _i7.Future<_i3.LoginResult>.value(
+            returnValueForMissingStub: _i8.Future<_i3.LoginResult>.value(
               _FakeLoginResult_1(
                 this,
                 Invocation.method(#login, [], {
@@ -205,10 +215,10 @@ class MockAuthService extends _i1.Mock implements _i12.AuthService {
               ),
             ),
           )
-          as _i7.Future<_i3.LoginResult>);
+          as _i8.Future<_i3.LoginResult>);
 
   @override
-  _i7.Future<void> register({
+  _i8.Future<void> register({
     required String? username,
     required String? password,
     String? nickname,
@@ -221,121 +231,169 @@ class MockAuthService extends _i1.Mock implements _i12.AuthService {
               #nickname: nickname,
               #phone: phone,
             }),
-            returnValue: _i7.Future<void>.value(),
-            returnValueForMissingStub: _i7.Future<void>.value(),
+            returnValue: _i8.Future<void>.value(),
+            returnValueForMissingStub: _i8.Future<void>.value(),
           )
-          as _i7.Future<void>);
+          as _i8.Future<void>);
 
   @override
-  _i7.Future<void> logout() =>
+  _i8.Future<void> logout() =>
       (super.noSuchMethod(
             Invocation.method(#logout, []),
-            returnValue: _i7.Future<void>.value(),
-            returnValueForMissingStub: _i7.Future<void>.value(),
+            returnValue: _i8.Future<void>.value(),
+            returnValueForMissingStub: _i8.Future<void>.value(),
           )
-          as _i7.Future<void>);
+          as _i8.Future<void>);
 
   @override
-  _i7.Future<_i3.UserInfo> fetchCurrentUser() =>
+  _i8.Future<_i3.UserInfo> fetchCurrentUser() =>
       (super.noSuchMethod(
             Invocation.method(#fetchCurrentUser, []),
-            returnValue: _i7.Future<_i3.UserInfo>.value(
+            returnValue: _i8.Future<_i3.UserInfo>.value(
               _FakeUserInfo_2(this, Invocation.method(#fetchCurrentUser, [])),
             ),
-            returnValueForMissingStub: _i7.Future<_i3.UserInfo>.value(
+            returnValueForMissingStub: _i8.Future<_i3.UserInfo>.value(
               _FakeUserInfo_2(this, Invocation.method(#fetchCurrentUser, [])),
             ),
           )
-          as _i7.Future<_i3.UserInfo>);
+          as _i8.Future<_i3.UserInfo>);
 }
 
-/// A class which mocks [HomeRecommendService].
+/// A class which mocks [ProductService].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockHomeRecommendService extends _i1.Mock
-    implements _i13.HomeRecommendService {
+class MockProductService extends _i1.Mock implements _i14.ProductService {
   @override
-  _i7.Future<_i4.HomeRecommendPageResult> fetchRecommendProducts({
-    required int? page,
+  _i8.Future<_i4.PageResult<_i15.ProductSummary>> fetchProducts({
+    int? categoryId,
+    String? keyword,
+    int? current = 1,
+    int? size = 10,
   }) =>
       (super.noSuchMethod(
-            Invocation.method(#fetchRecommendProducts, [], {#page: page}),
-            returnValue: _i7.Future<_i4.HomeRecommendPageResult>.value(
-              _FakeHomeRecommendPageResult_3(
+            Invocation.method(#fetchProducts, [], {
+              #categoryId: categoryId,
+              #keyword: keyword,
+              #current: current,
+              #size: size,
+            }),
+            returnValue: _i8.Future<_i4.PageResult<_i15.ProductSummary>>.value(
+              _FakePageResult_3<_i15.ProductSummary>(
                 this,
-                Invocation.method(#fetchRecommendProducts, [], {#page: page}),
+                Invocation.method(#fetchProducts, [], {
+                  #categoryId: categoryId,
+                  #keyword: keyword,
+                  #current: current,
+                  #size: size,
+                }),
               ),
             ),
             returnValueForMissingStub:
-                _i7.Future<_i4.HomeRecommendPageResult>.value(
-                  _FakeHomeRecommendPageResult_3(
+                _i8.Future<_i4.PageResult<_i15.ProductSummary>>.value(
+                  _FakePageResult_3<_i15.ProductSummary>(
                     this,
-                    Invocation.method(#fetchRecommendProducts, [], {
-                      #page: page,
+                    Invocation.method(#fetchProducts, [], {
+                      #categoryId: categoryId,
+                      #keyword: keyword,
+                      #current: current,
+                      #size: size,
                     }),
                   ),
                 ),
           )
-          as _i7.Future<_i4.HomeRecommendPageResult>);
+          as _i8.Future<_i4.PageResult<_i15.ProductSummary>>);
+
+  @override
+  _i8.Future<_i5.ProductDetail> fetchProductDetail(int? id) =>
+      (super.noSuchMethod(
+            Invocation.method(#fetchProductDetail, [id]),
+            returnValue: _i8.Future<_i5.ProductDetail>.value(
+              _FakeProductDetail_4(
+                this,
+                Invocation.method(#fetchProductDetail, [id]),
+              ),
+            ),
+            returnValueForMissingStub: _i8.Future<_i5.ProductDetail>.value(
+              _FakeProductDetail_4(
+                this,
+                Invocation.method(#fetchProductDetail, [id]),
+              ),
+            ),
+          )
+          as _i8.Future<_i5.ProductDetail>);
+
+  @override
+  _i8.Future<List<_i16.CategoryNode>> fetchCategoryTree() =>
+      (super.noSuchMethod(
+            Invocation.method(#fetchCategoryTree, []),
+            returnValue: _i8.Future<List<_i16.CategoryNode>>.value(
+              <_i16.CategoryNode>[],
+            ),
+            returnValueForMissingStub:
+                _i8.Future<List<_i16.CategoryNode>>.value(
+                  <_i16.CategoryNode>[],
+                ),
+          )
+          as _i8.Future<List<_i16.CategoryNode>>);
 }
 
 /// A class which mocks [PaymentGateway].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockPaymentGateway extends _i1.Mock implements _i14.PaymentGateway {
+class MockPaymentGateway extends _i1.Mock implements _i17.PaymentGateway {
   @override
-  _i7.Future<_i5.PaymentResult> pay(_i15.PaymentRequest? request) =>
+  _i8.Future<_i6.PaymentResult> pay(_i18.PaymentRequest? request) =>
       (super.noSuchMethod(
             Invocation.method(#pay, [request]),
-            returnValue: _i7.Future<_i5.PaymentResult>.value(
-              _FakePaymentResult_4(this, Invocation.method(#pay, [request])),
+            returnValue: _i8.Future<_i6.PaymentResult>.value(
+              _FakePaymentResult_5(this, Invocation.method(#pay, [request])),
             ),
-            returnValueForMissingStub: _i7.Future<_i5.PaymentResult>.value(
-              _FakePaymentResult_4(this, Invocation.method(#pay, [request])),
+            returnValueForMissingStub: _i8.Future<_i6.PaymentResult>.value(
+              _FakePaymentResult_5(this, Invocation.method(#pay, [request])),
             ),
           )
-          as _i7.Future<_i5.PaymentResult>);
+          as _i8.Future<_i6.PaymentResult>);
 }
 
 /// A class which mocks [PaymentOrderProvider].
 ///
 /// See the documentation for Mockito's code generation for more information.
 class MockPaymentOrderProvider extends _i1.Mock
-    implements _i16.PaymentOrderProvider {
+    implements _i19.PaymentOrderProvider {
   @override
-  _i7.Future<_i6.AlipayPaymentPayload> fetchAlipayPayload(
-    _i15.PaymentRequest? request,
+  _i8.Future<_i7.AlipayPaymentPayload> fetchAlipayPayload(
+    _i18.PaymentRequest? request,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#fetchAlipayPayload, [request]),
-            returnValue: _i7.Future<_i6.AlipayPaymentPayload>.value(
-              _FakeAlipayPaymentPayload_5(
+            returnValue: _i8.Future<_i7.AlipayPaymentPayload>.value(
+              _FakeAlipayPaymentPayload_6(
                 this,
                 Invocation.method(#fetchAlipayPayload, [request]),
               ),
             ),
             returnValueForMissingStub:
-                _i7.Future<_i6.AlipayPaymentPayload>.value(
-                  _FakeAlipayPaymentPayload_5(
+                _i8.Future<_i7.AlipayPaymentPayload>.value(
+                  _FakeAlipayPaymentPayload_6(
                     this,
                     Invocation.method(#fetchAlipayPayload, [request]),
                   ),
                 ),
           )
-          as _i7.Future<_i6.AlipayPaymentPayload>);
+          as _i8.Future<_i7.AlipayPaymentPayload>);
 }
 
 /// A class which mocks [PaymentSdkInitializer].
 ///
 /// See the documentation for Mockito's code generation for more information.
 class MockPaymentSdkInitializer extends _i1.Mock
-    implements _i17.PaymentSdkInitializer {
+    implements _i20.PaymentSdkInitializer {
   @override
-  _i7.Future<void> initialize(_i18.AppConfig? config) =>
+  _i8.Future<void> initialize(_i21.AppConfig? config) =>
       (super.noSuchMethod(
             Invocation.method(#initialize, [config]),
-            returnValue: _i7.Future<void>.value(),
-            returnValueForMissingStub: _i7.Future<void>.value(),
+            returnValue: _i8.Future<void>.value(),
+            returnValueForMissingStub: _i8.Future<void>.value(),
           )
-          as _i7.Future<void>);
+          as _i8.Future<void>);
 }

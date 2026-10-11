@@ -51,7 +51,7 @@ class OrderRecord {
       items: <CartItem>[
         CartItem(
           name: '轻弹跑鞋',
-          priceLabel: 'EUR 299',
+          priceLabel: '¥299',
           unitPrice: 299,
         ),
       ],
@@ -70,12 +70,12 @@ class OrderRecord {
       items: <CartItem>[
         CartItem(
           name: '极简双肩包',
-          priceLabel: 'EUR 129',
+          priceLabel: '¥129',
           unitPrice: 129,
         ),
         CartItem(
           name: '户外随行保温杯',
-          priceLabel: 'EUR 49',
+          priceLabel: '¥49',
           unitPrice: 49,
         ),
       ],
@@ -93,7 +93,7 @@ class OrderRecord {
       items: <CartItem>[
         CartItem(
           name: '香薰氛围灯',
-          priceLabel: 'EUR 139',
+          priceLabel: '¥139',
           unitPrice: 139,
         ),
       ],
@@ -147,7 +147,7 @@ class OrderRecord {
 
   String get statusLabel => status.label;
 
-  String get totalPriceLabel => 'EUR $totalPrice';
+  String get totalPriceLabel => '¥$totalPrice';
 
   String get shippingAddressLabel => shippingAddress.fullAddress;
 

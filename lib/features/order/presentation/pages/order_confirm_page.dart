@@ -144,7 +144,7 @@ class _OrderConfirmPageState extends State<OrderConfirmPage> {
             children: [
               Expanded(
                 child: Text(
-                  '应付 EUR $totalPrice',
+                  '应付 ¥$totalPrice',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),

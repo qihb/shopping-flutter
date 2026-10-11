@@ -9,13 +9,13 @@ void main() {
     const List<CartItem> items = <CartItem>[
       CartItem(
         name: '夏季轻运动鞋',
-        priceLabel: 'EUR 89',
+        priceLabel: '¥89',
         unitPrice: 89,
         quantity: 2,
       ),
       CartItem(
         name: '极简双肩包',
-        priceLabel: 'EUR 129',
+        priceLabel: '¥129',
         unitPrice: 129,
       ),
     ];
@@ -35,7 +35,7 @@ void main() {
     expect(order.status, OrderStatus.pendingPayment);
     expect(order.statusLabel, '待付款');
     expect(order.totalPrice, 307);
-    expect(order.totalPriceLabel, 'EUR 307');
+    expect(order.totalPriceLabel, '¥307');
     expect(order.shippingAddressLabel, '上海市浦东新区张江高科');
     expect(order.items, isNot(same(items)));
     expect(order.items.first.quantity, 2);

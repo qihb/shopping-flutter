@@ -9,9 +9,9 @@ import 'package:my_first_app/features/auth/application/auth_notifier.dart';
 import 'package:my_first_app/features/auth/data/auth_service.dart';
 import 'package:my_first_app/features/auth/data/token_store.dart';
 import 'package:my_first_app/features/cart/application/cart_notifier.dart';
-import 'package:my_first_app/features/home/data/home_recommend_service.dart';
 import 'package:my_first_app/features/order/application/order_notifier.dart';
 import 'package:my_first_app/features/payment/application/payment_service_factory.dart';
+import 'package:my_first_app/features/product/data/product_service.dart';
 import 'package:my_first_app/features/profile/application/address_notifier.dart';
 import 'package:my_first_app/features/profile/application/settings_notifier.dart';
 import 'package:my_first_app/features/profile/presentation/models/user_address.dart';
@@ -25,13 +25,13 @@ import 'package:my_first_app/features/profile/presentation/models/user_address.d
 /// 以前这些状态全部挤在 `MainTabPage` 的 State 里，
 /// 现在这些状态各自拆成独立的 Notifier，职责更清晰。
 class MyApp extends StatelessWidget {
-  /// 可选注入的推荐服务，主要用于测试。
-  final HomeRecommendService? recommendService;
+  /// 可选注入的商品服务，主要用于测试。
+  final ProductService? productService;
 
   /// 可选注入的登录态 Notifier，主要用于测试时替换真实网络实现。
   final AuthNotifier? authNotifier;
 
-  const MyApp({super.key, this.recommendService, this.authNotifier});
+  const MyApp({super.key, this.productService, this.authNotifier});
 
   /// 创建真实环境的登录态管理。
   ///
@@ -57,6 +57,16 @@ class MyApp extends StatelessWidget {
       authService: authService,
       tokenStore: tokenStore,
     )..restoreSession();
+  }
+
+  /// 创建真实环境的商品域服务。
+  ///
+  /// 首页推荐流、分类页、商品详情共用同一个 [ProductService]，
+  /// baseUrl 取当前环境配置。
+  ProductService _createProductService() {
+    return ProductService(
+      apiClient: ApiClient(baseUrl: AppConfigStore.instance.apiBaseUrl),
+    );
   }
 
   @override
@@ -102,7 +112,9 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         title: appConfig.appName,
         theme: AppTheme.light(),
-        home: MainTabPage(recommendService: recommendService),
+        home: MainTabPage(
+          productService: productService ?? _createProductService(),
+        ),
       ),
     );
   }

@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import 'package:my_first_app/features/cart/presentation/models/cart_item.dart';
-import 'package:my_first_app/features/home/presentation/models/home_recommend_product.dart';
+import 'package:my_first_app/features/product/data/models/product_summary.dart';
 
 /// 购物车状态管理。
 ///
@@ -29,7 +29,7 @@ class CartNotifier extends ChangeNotifier {
   /// 从商品详情 / 首页推荐商品加入购物车。
   ///
   /// 如果同名商品已存在，数量 +1；否则新增一条。
-  void addProduct(HomeRecommendProduct product) {
+  void addProduct(ProductSummary product) {
     final int existingIndex = _items.indexWhere(
       (item) => item.name == product.name,
     );
@@ -40,7 +40,7 @@ class CartNotifier extends ChangeNotifier {
         quantity: existingItem.quantity + 1,
       );
     } else {
-      _items.add(CartItem.fromHomeRecommendProduct(product));
+      _items.add(CartItem.fromProductSummary(product));
     }
 
     notifyListeners();

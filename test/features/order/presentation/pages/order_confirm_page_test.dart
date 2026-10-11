@@ -14,7 +14,7 @@ void main() {
           items: const <CartItem>[
             CartItem(
               name: '夏季轻运动鞋',
-              priceLabel: 'EUR 89',
+              priceLabel: '¥89',
               unitPrice: 89,
             ),
           ],
@@ -56,7 +56,7 @@ void main() {
           items: const <CartItem>[
             CartItem(
               name: '轻弹跑鞋',
-              priceLabel: 'EUR 299',
+              priceLabel: '¥299',
               unitPrice: 299,
             ),
           ],

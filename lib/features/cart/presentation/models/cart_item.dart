@@ -1,4 +1,4 @@
-import 'package:my_first_app/features/home/presentation/models/home_recommend_product.dart';
+import 'package:my_first_app/features/product/data/models/product_summary.dart';
 
 /// 购物车条目。
 ///
@@ -17,13 +17,15 @@ class CartItem {
     this.quantity = 1,
   });
 
-  /// 这里直接从首页推荐商品生成购物车条目，
-  /// 目的是先把“详情页加入购物车”这条链路打通。
-  factory CartItem.fromHomeRecommendProduct(HomeRecommendProduct product) {
+  /// 直接从商品摘要生成购物车条目，
+  /// 金额取商品最低价并向下取整，保持展示与计算一致。
+  factory CartItem.fromProductSummary(ProductSummary product) {
+    final int unitPrice = product.minPrice.truncate();
+
     return CartItem(
       name: product.name,
-      priceLabel: product.priceLabel,
-      unitPrice: _parseUnitPrice(product.priceLabel),
+      priceLabel: '¥$unitPrice',
+      unitPrice: unitPrice,
     );
   }
 
@@ -38,11 +40,5 @@ class CartItem {
 
   int get totalPrice => unitPrice * quantity;
 
-  String get totalPriceLabel => 'EUR $totalPrice';
-
-  static int _parseUnitPrice(String priceLabel) {
-    final RegExpMatch? match = RegExp(r'(\d+)$').firstMatch(priceLabel);
-
-    return int.tryParse(match?.group(1) ?? '') ?? 0;
-  }
+  String get totalPriceLabel => '¥$totalPrice';
 }

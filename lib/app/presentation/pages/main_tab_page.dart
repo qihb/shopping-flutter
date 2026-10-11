@@ -1,25 +1,27 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
-import 'package:my_first_app/features/auth/application/auth_notifier.dart';
-import 'package:my_first_app/features/auth/data/models/user_info.dart';
-import 'package:my_first_app/features/auth/presentation/pages/login_page.dart';
+import 'package:my_first_app/features/category/presentation/pages/category_page.dart';
 import 'package:my_first_app/features/cart/application/cart_notifier.dart';
 import 'package:my_first_app/features/cart/presentation/pages/cart_page.dart';
-import 'package:my_first_app/features/category/presentation/pages/category_page.dart';
-import 'package:my_first_app/features/home/data/home_recommend_service.dart';
-import 'package:my_first_app/features/home/presentation/models/home_recommend_product.dart';
 import 'package:my_first_app/features/home/presentation/pages/home_page.dart';
 import 'package:my_first_app/features/order/application/order_notifier.dart';
 import 'package:my_first_app/features/order/presentation/models/order_record.dart';
 import 'package:my_first_app/features/order/presentation/pages/order_confirm_page.dart';
 import 'package:my_first_app/features/payment/presentation/models/payment_method.dart';
 import 'package:my_first_app/features/payment/presentation/models/payment_result.dart';
+import 'package:my_first_app/features/product/data/models/category_node.dart';
+import 'package:my_first_app/features/product/data/models/product_summary.dart';
+import 'package:my_first_app/features/product/data/product_service.dart';
 import 'package:my_first_app/features/profile/application/address_notifier.dart';
 import 'package:my_first_app/features/profile/application/settings_notifier.dart';
 import 'package:my_first_app/features/profile/presentation/models/user_address.dart';
 import 'package:my_first_app/features/profile/presentation/models/user_profile_summary.dart';
 import 'package:my_first_app/features/profile/presentation/pages/profile_page.dart';
+import 'package:provider/provider.dart';
+
+import 'package:my_first_app/features/auth/application/auth_notifier.dart';
+import 'package:my_first_app/features/auth/data/models/user_info.dart';
+import 'package:my_first_app/features/auth/presentation/pages/login_page.dart';
 
 /// 带底部导航的主页面。
 ///
@@ -27,10 +29,10 @@ import 'package:my_first_app/features/profile/presentation/pages/profile_page.da
 /// 购物车、订单、地址、设置等跨页面状态全部拆到各自的 `ChangeNotifier` 中，
 /// 通过 `provider` 包注入到子树。
 class MainTabPage extends StatefulWidget {
-  /// 可选注入的推荐服务，主要用于测试。
-  final HomeRecommendService? recommendService;
+  /// 可选注入的商品服务，主要用于测试。
+  final ProductService? productService;
 
-  const MainTabPage({super.key, this.recommendService});
+  const MainTabPage({super.key, this.productService});
 
   @override
   State<MainTabPage> createState() => _MainTabPageState();
@@ -38,7 +40,9 @@ class MainTabPage extends StatefulWidget {
 
 class _MainTabPageState extends State<MainTabPage> {
   int _currentIndex = 0;
-  String? _selectedCategoryLabel;
+
+  /// 首页分类入口点击后要定位到的分类 id，null 表示分类页用默认选中项。
+  int? _selectedCategoryId;
 
   // ---------- 辅助 getter ----------
 
@@ -83,16 +87,17 @@ class _MainTabPageState extends State<MainTabPage> {
     });
   }
 
-  void _openCategoryFromHome(String categoryLabel) {
+  /// 首页分类入口：携带一级分类 id 跳到分类页并选中对应分类。
+  void _openCategoryFromHome(CategoryNode category) {
     setState(() {
-      _selectedCategoryLabel = categoryLabel;
+      _selectedCategoryId = category.id;
       _currentIndex = 1;
     });
   }
 
   // ---------- 加购 ----------
 
-  void _addProductToCart(BuildContext context, HomeRecommendProduct product) {
+  void _addProductToCart(BuildContext context, ProductSummary product) {
     context.read<CartNotifier>().addProduct(product);
     setState(() {
       _currentIndex = 2;
@@ -149,6 +154,11 @@ class _MainTabPageState extends State<MainTabPage> {
 
     if (result.status == PaymentStatus.success) {
       cartNotifier.clear();
+    }
+
+    // 支付流程跨了异步间隙，弹提示前必须确认页面还在组件树里。
+    if (!context.mounted) {
+      return result.status == PaymentStatus.success;
     }
 
     _showMessage(context, result.message);
@@ -248,11 +258,12 @@ class _MainTabPageState extends State<MainTabPage> {
       HomePage(
         onCategoryTap: _openCategoryFromHome,
         onAddToCart: (product) => _addProductToCart(context, product),
-        recommendService: widget.recommendService,
+        productService: widget.productService,
       ),
       CategoryPage(
-        initialCategoryLabel: _selectedCategoryLabel,
+        initialCategoryId: _selectedCategoryId,
         onAddToCart: (product) => _addProductToCart(context, product),
+        productService: widget.productService,
       ),
       // 购物车页现在直接从 CartNotifier 读取数据，
       // 但仍然预留回调出口，由 MainTabPage 编排跨 Notifier 的操作。

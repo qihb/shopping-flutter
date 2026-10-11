@@ -1,38 +1,42 @@
 import 'package:flutter/material.dart';
 
+import 'package:my_first_app/app/config/app_config_store.dart';
 import 'package:my_first_app/core/api/api_client.dart';
-import 'package:my_first_app/features/home/data/home_recommend_service.dart';
-import 'package:my_first_app/features/home/presentation/models/home_recommend_product.dart';
 import 'package:my_first_app/features/home/presentation/widgets/home_banner_carousel.dart';
-import 'package:my_first_app/features/home/presentation/widgets/recommend_product_card.dart';
-import 'package:my_first_app/features/home/presentation/pages/product_detail_page.dart';
+import 'package:my_first_app/features/product/data/models/category_node.dart';
+import 'package:my_first_app/features/product/data/models/page_result.dart';
+import 'package:my_first_app/features/product/data/models/product_summary.dart';
+import 'package:my_first_app/features/product/data/product_service.dart';
+import 'package:my_first_app/features/product/presentation/pages/product_detail_page.dart';
+import 'package:my_first_app/features/product/presentation/widgets/product_card.dart';
 
 /// 首页页面。
 ///
-/// 现在推荐商品数据从 [HomeRecommendService] 获取，
-/// 它内部通过 `http` 包发起真实 HTTP GET 请求到 FakeStore API，
-/// 替换了之前的 mock 延迟。
+/// 推荐商品与热门分类数据均来自 spring-shop 后端接口：
+/// - 推荐流通过 [ProductService.fetchProducts] 按页加载
+/// - 热门分类入口通过 [ProductService.fetchCategoryTree] 取一级分类
 class HomePage extends StatefulWidget {
-  static const List<_HomeCategoryItem> _categories = [
-    _HomeCategoryItem(label: '服饰', icon: Icons.checkroom_outlined),
-    _HomeCategoryItem(label: '鞋靴', icon: Icons.hiking_outlined),
-    _HomeCategoryItem(label: '箱包', icon: Icons.work_outline),
-    _HomeCategoryItem(label: '数码', icon: Icons.devices_outlined),
-    _HomeCategoryItem(label: '家居', icon: Icons.chair_outlined),
-    _HomeCategoryItem(label: '食品', icon: Icons.local_grocery_store_outlined),
-  ];
+  /// 一级分类名到图标的映射，未命中的分类统一用兜底图标。
+  static const Map<String, IconData> _categoryIconMap = <String, IconData>{
+    '服饰': Icons.checkroom_outlined,
+    '鞋靴': Icons.hiking_outlined,
+    '箱包': Icons.work_outline,
+    '数码': Icons.devices_outlined,
+    '家居': Icons.chair_outlined,
+    '食品': Icons.local_grocery_store_outlined,
+  };
 
-  final ValueChanged<String>? onCategoryTap;
-  final ValueChanged<HomeRecommendProduct>? onAddToCart;
+  final void Function(CategoryNode category)? onCategoryTap;
+  final ValueChanged<ProductSummary>? onAddToCart;
 
-  /// 可选注入的推荐服务，主要用于测试。
-  final HomeRecommendService? recommendService;
+  /// 可选注入的商品服务，主要用于测试。
+  final ProductService? productService;
 
   const HomePage({
     super.key,
     this.onCategoryTap,
     this.onAddToCart,
-    this.recommendService,
+    this.productService,
   });
 
   @override
@@ -42,16 +46,17 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final ScrollController _scrollController = ScrollController();
 
-  /// 使用真实 HTTP 请求的推荐服务。
+  /// 使用 spring-shop 后端的商品服务。
   ///
   /// 优先使用外部注入的服务（测试时可注入 mock），
-  /// 否则默认连接到 FakeStore API。
-  late final HomeRecommendService _recommendService = widget.recommendService ??
-      HomeRecommendService(
-        apiClient: ApiClient(baseUrl: 'https://fakestoreapi.com'),
+  /// 否则按当前环境配置的 baseUrl 懒创建真实实例。
+  late final ProductService _productService = widget.productService ??
+      ProductService(
+        apiClient: ApiClient(baseUrl: AppConfigStore.instance.apiBaseUrl),
       );
 
-  final List<HomeRecommendProduct> _products = <HomeRecommendProduct>[];
+  final List<ProductSummary> _products = [];
+  List<CategoryNode> _categories = <CategoryNode>[];
 
   bool _isInitialLoading = true;
   bool _isLoadingMore = false;
@@ -65,6 +70,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _scrollController.addListener(_handleScroll);
+    _loadCategories();
     _loadMoreProducts();
   }
 
@@ -73,6 +79,27 @@ class _HomePageState extends State<HomePage> {
     _scrollController.removeListener(_handleScroll);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  /// 加载一级分类快捷入口。
+  ///
+  /// 属于锦上添花的导航区，加载失败时静默回退为空列表，
+  /// 不影响下方推荐流的正常浏览。
+  Future<void> _loadCategories() async {
+    try {
+      final List<CategoryNode> categories =
+          await _productService.fetchCategoryTree();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _categories = categories;
+      });
+    } catch (e) {
+      // 静默失败：分类入口缺席，推荐流仍然可用。
+    }
   }
 
   void _handleScroll() {
@@ -103,8 +130,8 @@ class _HomePageState extends State<HomePage> {
     }
 
     try {
-      final HomeRecommendPageResult pageResult =
-          await _recommendService.fetchRecommendProducts(page: _nextPage);
+      final PageResult<ProductSummary> pageResult = await _productService
+          .fetchProducts(current: _nextPage);
 
       if (!mounted) {
         _isRequestInFlight = false;
@@ -112,7 +139,7 @@ class _HomePageState extends State<HomePage> {
       }
 
       setState(() {
-        _products.addAll(pageResult.products);
+        _products.addAll(pageResult.records);
         _hasMore = pageResult.hasMore;
         _nextPage += 1;
         _isInitialLoading = false;
@@ -151,14 +178,16 @@ class _HomePageState extends State<HomePage> {
     });
 
     await _loadMoreProducts();
+    _loadCategories();
   }
 
-  void _openProductDetail(HomeRecommendProduct product) {
+  void _openProductDetail(ProductSummary product) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => ProductDetailPage(
-          product: product,
-          onAddToCart: () => widget.onAddToCart?.call(product),
+          productId: product.id,
+          productService: _productService,
+          onAddToCart: widget.onAddToCart,
         ),
       ),
     );
@@ -186,22 +215,23 @@ class _HomePageState extends State<HomePage> {
                     const SizedBox(height: 24),
                     _HomeSectionTitle(
                       title: '热门分类',
-                      subtitle: '先用快捷入口模拟电商首页里的一级分类导航',
+                      subtitle: '来自后端分类树的一级分类，点击直达分类页',
                     ),
                     const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: HomePage._categories
-                          .map(
-                            (item) => _HomeCategoryChip(
-                              item: item,
-                              onTap: () =>
-                                  widget.onCategoryTap?.call(item.label),
-                            ),
-                          )
-                          .toList(),
-                    ),
+                    if (_categories.isNotEmpty)
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: _categories
+                            .map(
+                              (category) => _HomeCategoryChip(
+                                category: category,
+                                onTap: () =>
+                                    widget.onCategoryTap?.call(category),
+                              ),
+                            )
+                            .toList(),
+                      ),
                     const SizedBox(height: 24),
                   ],
                 ),
@@ -247,11 +277,8 @@ class _HomePageState extends State<HomePage> {
         ..._products.map(
           (product) => Padding(
             padding: const EdgeInsets.only(bottom: 12),
-            child: RecommendProductCard(
-              name: product.name,
-              description: product.description,
-              priceLabel: product.priceLabel,
-              tag: product.tag,
+            child: ProductCard(
+              product: product,
               onTap: () => _openProductDetail(product),
             ),
           ),
@@ -334,7 +361,7 @@ class _RecommendSectionHeaderDelegate extends SliverPersistentHeaderDelegate {
           alignment: Alignment.bottomLeft,
           child: _HomeSectionTitle(
             title: '为你推荐',
-            subtitle: '数据来自 FakeStore API，通过 http 包发起真实网络请求',
+            subtitle: '数据来自 spring-shop 后端商品接口',
           ),
         ),
       ),
@@ -487,10 +514,13 @@ class _RecommendLoadMoreFinished extends StatelessWidget {
 
 /// 分类快捷入口。
 class _HomeCategoryChip extends StatelessWidget {
-  final _HomeCategoryItem item;
+  final CategoryNode category;
   final VoidCallback onTap;
 
-  const _HomeCategoryChip({required this.item, required this.onTap});
+  const _HomeCategoryChip({required this.category, required this.onTap});
+
+  IconData get _icon =>
+      HomePage._categoryIconMap[category.name] ?? Icons.category_outlined;
 
   @override
   Widget build(BuildContext context) {
@@ -508,21 +538,13 @@ class _HomeCategoryChip extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(item.icon),
+              Icon(_icon),
               const SizedBox(height: 8),
-              Text(item.label, style: Theme.of(context).textTheme.bodyMedium),
+              Text(category.name, style: Theme.of(context).textTheme.bodyMedium),
             ],
           ),
         ),
       ),
     );
   }
-}
-
-/// 分类入口的数据结构。
-class _HomeCategoryItem {
-  final String label;
-  final IconData icon;
-
-  const _HomeCategoryItem({required this.label, required this.icon});
 }

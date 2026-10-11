@@ -90,7 +90,7 @@ class CartPage extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    '合计 EUR ${cartNotifier.totalPrice}',
+                    '合计 ¥${cartNotifier.totalPrice}',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),

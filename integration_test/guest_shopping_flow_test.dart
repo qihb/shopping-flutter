@@ -12,7 +12,7 @@ import 'package:patrol/patrol.dart';
 const Duration _quickSettle = Duration(seconds: 3);
 
 /// 商品卡片的 InkWell 上带有 `home-product-card-<商品名>` 形态的 key。
-/// 商品数据来自 FakeStore 公网接口，商品名编译期不可知，
+/// 商品数据来自 spring-shop 后端接口，商品名编译期不可知，
 /// 所以这里用谓词匹配所有商品卡片，而不是写死某个商品名。
 Finder _productCardFinder() => find.byWidgetPredicate(
   (Widget widget) =>
@@ -45,7 +45,7 @@ Future<void> _launchApp(PatrolIntegrationTester $) async {
 /// 返回从卡片 key 反解出的商品名，供后续断言使用；
 /// 加购后应用会自动切到购物车 tab（MainTabPage 行为）。
 Future<String> _addFirstProductToCart(PatrolIntegrationTester $) async {
-  // 推荐商品来自公网 FakeStore 接口，scrollUntilVisible 内部会
+  // 推荐商品来自 spring-shop 后端接口，scrollUntilVisible 内部会
   // 先等卡片可点击（已可见则不滚动），不可见则逐段滚动直到可点击。
   final card = await $.scrollUntilVisible(
     finder: _productCardFinder(),

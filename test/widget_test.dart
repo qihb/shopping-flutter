@@ -16,13 +16,65 @@ import 'package:my_first_app/features/home/presentation/models/home_banner_item.
 import 'package:my_first_app/features/home/presentation/pages/home_banner_detail_page.dart';
 import 'package:my_first_app/features/home/presentation/widgets/home_banner_carousel.dart';
 import 'package:my_first_app/features/home/presentation/widgets/home_banner_video_player.dart';
+import 'package:my_first_app/features/product/data/models/category_node.dart';
+import 'package:my_first_app/features/product/data/models/page_result.dart';
+import 'package:my_first_app/features/product/data/models/product_summary.dart';
 import 'helpers/mocks.mocks.dart';
 import 'helpers/stub_helpers.dart';
 
-/// 创建已打桩的推荐服务：按页返回生产 mock 数据。
-MockHomeRecommendService _buildRecommendService() {
-  final MockHomeRecommendService service = MockHomeRecommendService();
-  stubRecommendFromMockData(service);
+/// 创建已打桩的商品服务：首页分页、分类树与分类页商品全部固定返回。
+MockProductService _buildProductService() {
+  final MockProductService service = MockProductService();
+  when(service.fetchProducts(
+    categoryId: anyNamed('categoryId'),
+    keyword: anyNamed('keyword'),
+    current: anyNamed('current'),
+    size: anyNamed('size'),
+  )).thenAnswer((Invocation invocation) async {
+    final int? categoryId = invocation.namedArguments[#categoryId] as int?;
+
+    if (categoryId != null) {
+      // 分类页商品：一级分类“服饰”默认选中首个子分类“男装”。
+      return PageResult<ProductSummary>(
+        records: <ProductSummary>[
+          buildTestProduct(101, '男装夹克', categoryId: categoryId, categoryName: '男装'),
+          buildTestProduct(102, '基础款T恤', categoryId: categoryId, categoryName: '男装'),
+        ],
+        total: 2,
+        pages: 1,
+        current: 1,
+        size: 10,
+      );
+    }
+
+    // 首页推荐流第一页。
+    return PageResult<ProductSummary>(
+      records: <ProductSummary>[
+        buildTestProduct(1, '夏季轻运动鞋'),
+        buildTestProduct(2, '极简双肩包', minPrice: 129),
+      ],
+      total: 2,
+      pages: 1,
+      current: 1,
+      size: 10,
+    );
+  });
+
+  // 分类树：服饰带二级分类，鞋靴/数码为一级分类。
+  when(service.fetchCategoryTree()).thenAnswer(
+    (_) async => <CategoryNode>[
+      buildTestCategory(
+        1,
+        '服饰',
+        children: <CategoryNode>[
+          buildTestCategory(11, '男装', parentId: 1),
+          buildTestCategory(12, '女装', parentId: 1),
+        ],
+      ),
+      buildTestCategory(2, '鞋靴'),
+      buildTestCategory(3, '数码'),
+    ],
+  );
   return service;
 }
 
@@ -34,7 +86,7 @@ Widget _buildTestMyApp() {
   when(tokenStore.readToken()).thenAnswer((_) async => null);
 
   return MyApp(
-    recommendService: _buildRecommendService(),
+    productService: _buildProductService(),
     authNotifier: AuthNotifier(
       authService: authService,
       tokenStore: tokenStore,
@@ -83,8 +135,8 @@ void main() {
 
     await tester.tap(find.text('分类'));
     await tester.pumpAndSettle();
-    expect(find.text('运动速干T恤'), findsOneWidget);
-    expect(find.text('轻量防晒衬衫'), findsOneWidget);
+    expect(find.text('男装夹克'), findsOneWidget);
+    expect(find.text('基础款T恤'), findsOneWidget);
 
     await tester.tap(find.text('购物车'));
     await tester.pumpAndSettle();

@@ -12,6 +12,10 @@ import 'package:my_first_app/features/payment/application/payment_service.dart';
 import 'package:my_first_app/features/payment/data/models/payment_request.dart';
 import 'package:my_first_app/features/payment/presentation/models/payment_method.dart';
 import 'package:my_first_app/features/payment/presentation/models/payment_result.dart';
+import 'package:my_first_app/features/product/data/models/category_node.dart';
+import 'package:my_first_app/features/product/data/models/page_result.dart';
+import 'package:my_first_app/features/product/data/models/product_detail.dart';
+import 'package:my_first_app/features/product/data/models/product_summary.dart';
 import 'package:my_first_app/features/profile/application/address_notifier.dart';
 import 'package:my_first_app/features/profile/application/settings_notifier.dart';
 import 'package:my_first_app/features/profile/presentation/models/user_address.dart';
@@ -29,10 +33,99 @@ AuthNotifier _buildAuthNotifier() {
   )..restoreSession();
 }
 
-/// 创建已打桩的推荐服务：按页返回 [HomeRecommendMockService] 的固定数据。
-MockHomeRecommendService _buildRecommendService() {
-  final MockHomeRecommendService service = MockHomeRecommendService();
-  stubRecommendFromMockData(service);
+/// 测试用的分类树：服饰带二级分类，鞋靴/数码为一级分类直挂商品。
+List<CategoryNode> _buildCategoryTree() {
+  return <CategoryNode>[
+    buildTestCategory(
+      1,
+      '服饰',
+      children: <CategoryNode>[
+        buildTestCategory(11, '男装', parentId: 1),
+        buildTestCategory(12, '女装', parentId: 1),
+      ],
+    ),
+    buildTestCategory(2, '鞋靴'),
+    buildTestCategory(3, '数码'),
+  ];
+}
+
+/// 创建已打桩的商品服务：首页分页、分类树、分类商品与商品详情全部固定返回。
+MockProductService _buildProductService() {
+  final MockProductService service = MockProductService();
+
+  // 首页推荐流固定两页数据。
+  when(service.fetchProducts(
+    categoryId: anyNamed('categoryId'),
+    keyword: anyNamed('keyword'),
+    current: anyNamed('current'),
+    size: anyNamed('size'),
+  )).thenAnswer((Invocation invocation) async {
+    final int? categoryId = invocation.namedArguments[#categoryId] as int?;
+    final int current = invocation.namedArguments[#current] as int;
+
+    if (categoryId != null) {
+      final Map<int, List<ProductSummary>> productsByCategory =
+          <int, List<ProductSummary>>{
+        11: <ProductSummary>[
+          buildTestProduct(101, '男装夹克', categoryId: 11, categoryName: '男装'),
+          buildTestProduct(102, '基础款T恤', categoryId: 11, categoryName: '男装'),
+        ],
+        2: <ProductSummary>[
+          buildTestProduct(201, '轻弹跑鞋', categoryId: 2, categoryName: '鞋靴', minPrice: 299),
+          buildTestProduct(202, '城市通勤板鞋', categoryId: 2, categoryName: '鞋靴', minPrice: 269),
+        ],
+      };
+      final List<ProductSummary> records =
+          productsByCategory[categoryId] ?? <ProductSummary>[];
+      return PageResult<ProductSummary>(
+        records: records,
+        total: records.length,
+        pages: 1,
+        current: 1,
+        size: 10,
+      );
+    }
+
+    if (current <= 1) {
+      return PageResult<ProductSummary>(
+        records: <ProductSummary>[
+          buildTestProduct(1, '夏季轻运动鞋'),
+          buildTestProduct(2, '极简双肩包', minPrice: 129),
+        ],
+        total: 2,
+        pages: 1,
+        current: 1,
+        size: 10,
+      );
+    }
+
+    return PageResult<ProductSummary>(
+      records: const <ProductSummary>[],
+      total: 2,
+      pages: 1,
+      current: current,
+      size: 10,
+    );
+  });
+
+  when(service.fetchCategoryTree())
+      .thenAnswer((_) async => _buildCategoryTree());
+
+  // 商品详情按 id 返回对应数据。
+  when(service.fetchProductDetail(any))
+      .thenAnswer((Invocation invocation) async {
+    final int id = invocation.positionalArguments.first as int;
+    final Map<int, ProductDetail> details = <int, ProductDetail>{
+      1: buildTestProductDetail(1, '夏季轻运动鞋', minPrice: 89),
+      2: buildTestProductDetail(2, '极简双肩包', minPrice: 129),
+      101: buildTestProductDetail(101, '男装夹克', minPrice: 199),
+      102: buildTestProductDetail(102, '基础款T恤', minPrice: 99),
+      201: buildTestProductDetail(201, '轻弹跑鞋', minPrice: 299),
+      202: buildTestProductDetail(202, '城市通勤板鞋', minPrice: 269),
+    };
+    return details[id] ?? buildTestProductDetail(id, '未配置的测试商品');
+  });
+
   return service;
 }
 
@@ -121,7 +214,7 @@ Widget _buildTestApp({
     ],
     child: MaterialApp(
       home: MainTabPage(
-        recommendService: _buildRecommendService(),
+        productService: _buildProductService(),
       ),
     ),
   );
@@ -215,8 +308,8 @@ void main() {
     await _addProductToCart(tester);
 
     expect(find.text('夏季轻运动鞋'), findsOneWidget);
-    expect(find.text('EUR 89'), findsWidgets);
-    expect(find.text('合计 EUR 89'), findsOneWidget);
+    expect(find.text('¥89'), findsWidgets);
+    expect(find.text('合计 ¥89'), findsOneWidget);
   });
 
   testWidgets('购物车里修改商品数量后会同步更新数量和合计金额', (WidgetTester tester) async {
@@ -230,7 +323,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('数量 x2'), findsOneWidget);
-    expect(find.text('合计 EUR 178'), findsOneWidget);
+    expect(find.text('合计 ¥178'), findsOneWidget);
 
     await tester.tap(
       find.byKey(const ValueKey<String>('cart-decrease-夏季轻运动鞋')),
@@ -238,7 +331,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('数量 x1'), findsOneWidget);
-    expect(find.text('合计 EUR 89'), findsOneWidget);
+    expect(find.text('合计 ¥89'), findsOneWidget);
   });
 
   testWidgets('从购物车进入订单确认页后支付成功并在我的页面显示订单', (WidgetTester tester) async {
@@ -515,15 +608,13 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
-      find.byKey(const ValueKey<String>('category-product-轻弹跑鞋')),
+      find.text('轻弹跑鞋'),
       200,
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(
-      find.byKey(const ValueKey<String>('category-product-轻弹跑鞋')),
-    );
+    await tester.tap(find.text('轻弹跑鞋'));
     await tester.pumpAndSettle();
 
     expect(find.text('商品详情'), findsOneWidget);
@@ -542,7 +633,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('轻弹跑鞋'), findsOneWidget);
-    expect(find.text('合计 EUR 299'), findsOneWidget);
+    expect(find.text('合计 ¥299'), findsOneWidget);
   });
 
   testWidgets('加入购物车后会显示提示并更新购物车角标', (WidgetTester tester) async {
@@ -568,15 +659,13 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
-      find.byKey(const ValueKey<String>('category-product-轻弹跑鞋')),
+      find.text('轻弹跑鞋'),
       200,
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(
-      find.byKey(const ValueKey<String>('category-product-轻弹跑鞋')),
-    );
+    await tester.tap(find.text('轻弹跑鞋'));
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(

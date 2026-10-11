@@ -1,75 +1,267 @@
 import 'package:flutter/material.dart';
 
-import 'package:my_first_app/features/home/presentation/models/home_recommend_product.dart';
-import 'package:my_first_app/features/home/presentation/pages/product_detail_page.dart';
+import 'package:my_first_app/app/config/app_config_store.dart';
+import 'package:my_first_app/core/api/api_client.dart';
+import 'package:my_first_app/features/product/data/models/category_node.dart';
+import 'package:my_first_app/features/product/data/models/page_result.dart';
+import 'package:my_first_app/features/product/data/models/product_summary.dart';
+import 'package:my_first_app/features/product/data/product_service.dart';
+import 'package:my_first_app/features/product/presentation/pages/product_detail_page.dart';
+import 'package:my_first_app/features/product/presentation/widgets/product_card.dart';
 
 /// 分类页。
 ///
-/// 采用“左侧分类导航 + 右侧商品网格”的双栏结构，
+/// 采用“左侧分类导航 + 右侧商品列表”的双栏结构，
 /// 这是电商 App 常见的分类页组织方式。
 ///
-/// 左侧展示当前浏览的大类目录，右侧展示对应分类下的商品卡片列表，
-/// 后续可继续接入筛选、二级分类与真实数据。
+/// 左侧展示后端分类树的一级分类；选中分类若有子分类，
+/// 右侧顶部横滑 chips 展示二级分类，商品列表按当前选中分类 id 分页加载。
 class CategoryPage extends StatefulWidget {
-  /// 承接“从首页点击某个分类后，分类页默认选中哪个分类”，
+  /// 承接“从首页点击某个分类后，分类页默认选中哪个一级分类”，
   /// 等价于进入页面时携带的初始筛选条件。
-  final String? initialCategoryLabel;
-  final ValueChanged<HomeRecommendProduct>? onAddToCart;
+  final int? initialCategoryId;
+  final ValueChanged<ProductSummary>? onAddToCart;
 
-  const CategoryPage({super.key, this.initialCategoryLabel, this.onAddToCart});
+  /// 可选注入的商品服务，主要用于测试；为 null 时懒创建真实实例。
+  final ProductService? productService;
+
+  const CategoryPage({
+    super.key,
+    this.initialCategoryId,
+    this.onAddToCart,
+    this.productService,
+  });
 
   @override
   State<CategoryPage> createState() => _CategoryPageState();
 }
 
 class _CategoryPageState extends State<CategoryPage> {
-  late int _selectedCategoryIndex;
+  final ScrollController _scrollController = ScrollController();
+
+  /// 与 HomePage 一致：service 为 null 时按当前环境配置懒创建真实实例。
+  late final ProductService _productService = widget.productService ??
+      ProductService(
+        apiClient: ApiClient(baseUrl: AppConfigStore.instance.apiBaseUrl),
+      );
+
+  List<CategoryNode> _categories = <CategoryNode>[];
+  bool _isCategoriesLoading = true;
+  String? _categoryErrorMessage;
+
+  int _selectedCategoryIndex = 0;
+
+  /// 有子分类时右侧默认选中的二级分类下标。
+  int _selectedSubIndex = 0;
+
+  final List<ProductSummary> _products = <ProductSummary>[];
+  bool _isProductsLoading = false;
+  bool _isLoadingMore = false;
+  bool _isRequestInFlight = false;
+  bool _hasMore = true;
+  int _nextPage = 1;
+  String? _productErrorMessage;
 
   @override
   void initState() {
     super.initState();
-    _selectedCategoryIndex = _findInitialCategoryIndex();
+    _scrollController.addListener(_handleScroll);
+    _loadCategories();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_handleScroll);
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
   void didUpdateWidget(covariant CategoryPage oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (oldWidget.initialCategoryLabel != widget.initialCategoryLabel) {
-      _selectedCategoryIndex = _findInitialCategoryIndex();
+    // 首页分类入口切换目标分类时，重新定位左侧选中项并刷新商品。
+    if (oldWidget.initialCategoryId != widget.initialCategoryId &&
+        _categories.isNotEmpty) {
+      _selectCategory(_findInitialCategoryIndex());
     }
   }
 
   int _findInitialCategoryIndex() {
-    final String? targetLabel = widget.initialCategoryLabel;
+    final int? targetId = widget.initialCategoryId;
 
-    if (targetLabel == null) {
+    if (targetId == null) {
       return 0;
     }
 
-    final int index = _categorySections.indexWhere(
-      (section) => section.label == targetLabel,
-    );
+    final int index =
+        _categories.indexWhere((category) => category.id == targetId);
 
     return index >= 0 ? index : 0;
   }
 
-  void _openProductDetail({
-    required _CategorySection section,
-    required _CategoryProduct product,
-  }) {
-    final HomeRecommendProduct detailProduct = HomeRecommendProduct(
-      name: product.name,
-      description: '${section.label}分类精选单品。',
-      priceLabel: 'EUR ${product.priceLabel}',
-      tag: section.label,
-    );
+  CategoryNode? get _activeCategory {
+    if (_categories.isEmpty) {
+      return null;
+    }
+    return _categories[_selectedCategoryIndex.clamp(0, _categories.length - 1)];
+  }
 
+  CategoryNode? get _activeSubCategory {
+    final CategoryNode? category = _activeCategory;
+    if (category == null || category.children.isEmpty) {
+      return null;
+    }
+    return category.children[_selectedSubIndex.clamp(
+      0,
+      category.children.length - 1,
+    )];
+  }
+
+  /// 当前用于查询商品的分类 id：有子分类用子分类，否则用一级分类。
+  int? get _activeCategoryId =>
+      _activeSubCategory?.id ?? _activeCategory?.id;
+
+  /// 当前右侧标题：子分类名优先，其次一级分类名。
+  String get _activeCategoryLabel =>
+      _activeSubCategory?.name ?? _activeCategory?.name ?? '';
+
+  /// 加载分类树；失败时给出错误态与重试入口。
+  Future<void> _loadCategories() async {
+    setState(() {
+      _isCategoriesLoading = true;
+      _categoryErrorMessage = null;
+    });
+
+    try {
+      final List<CategoryNode> categories =
+          await _productService.fetchCategoryTree();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _categories = categories;
+        _isCategoriesLoading = false;
+        _selectedCategoryIndex = _findInitialCategoryIndex();
+        _selectedSubIndex = 0;
+      });
+      _reloadProducts();
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isCategoriesLoading = false;
+        _categoryErrorMessage = '分类加载失败，请重试。';
+      });
+    }
+  }
+
+  /// 切换左侧一级分类：重置二级选中并重新加载商品。
+  void _selectCategory(int index) {
+    setState(() {
+      _selectedCategoryIndex = index;
+      _selectedSubIndex = 0;
+    });
+    _reloadProducts();
+  }
+
+  /// 切换右侧二级分类 chips。
+  void _selectSubCategory(int index) {
+    setState(() {
+      _selectedSubIndex = index;
+    });
+    _reloadProducts();
+  }
+
+  /// 清空商品列表回到第一页并重新加载。
+  Future<void> _reloadProducts() async {
+    if (_isRequestInFlight) {
+      return;
+    }
+
+    setState(() {
+      _products.clear();
+      _isProductsLoading = true;
+      _isLoadingMore = false;
+      _hasMore = true;
+      _nextPage = 1;
+      _productErrorMessage = null;
+    });
+
+    await _loadMoreProducts();
+  }
+
+  void _handleScroll() {
+    if (!_scrollController.hasClients) {
+      return;
+    }
+
+    final ScrollPosition position = _scrollController.position;
+
+    if (position.extentAfter <= 24) {
+      _loadMoreProducts();
+    }
+  }
+
+  Future<void> _loadMoreProducts() async {
+    final int? categoryId = _activeCategoryId;
+
+    if (_isRequestInFlight || !_hasMore || categoryId == null) {
+      return;
+    }
+
+    _isRequestInFlight = true;
+
+    if (_nextPage > 1) {
+      setState(() {
+        _isLoadingMore = true;
+      });
+    }
+
+    try {
+      final PageResult<ProductSummary> pageResult = await _productService
+          .fetchProducts(categoryId: categoryId, current: _nextPage);
+
+      if (!mounted) {
+        _isRequestInFlight = false;
+        return;
+      }
+
+      setState(() {
+        _products.addAll(pageResult.records);
+        _hasMore = pageResult.hasMore;
+        _nextPage += 1;
+        _isProductsLoading = false;
+        _isLoadingMore = false;
+        _isRequestInFlight = false;
+        _productErrorMessage = null;
+      });
+    } catch (e) {
+      if (!mounted) {
+        _isRequestInFlight = false;
+        return;
+      }
+
+      setState(() {
+        _isProductsLoading = false;
+        _isLoadingMore = false;
+        _isRequestInFlight = false;
+        _productErrorMessage = '分类商品加载失败，请重试。';
+      });
+    }
+  }
+
+  void _openProductDetail(ProductSummary product) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => ProductDetailPage(
-          product: detailProduct,
-          onAddToCart: () => widget.onAddToCart?.call(detailProduct),
+          productId: product.id,
+          productService: _productService,
+          onAddToCart: widget.onAddToCart,
         ),
       ),
     );
@@ -77,508 +269,332 @@ class _CategoryPageState extends State<CategoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final _CategorySection activeSection =
-        _categorySections[_selectedCategoryIndex];
     final ColorScheme colorScheme = Theme.of(context).colorScheme;
 
     return SafeArea(
       child: Row(
         children: [
-          Container(
-            width: 96,
-            color: colorScheme.surfaceContainerLowest,
-            child: ListView.builder(
-              itemCount: _categorySections.length,
-              itemBuilder: (context, index) {
-                final _CategorySection section = _categorySections[index];
-                final bool isSelected = index == _selectedCategoryIndex;
-
-                return InkWell(
-                  onTap: () {
-                    setState(() {
-                      _selectedCategoryIndex = index;
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 18,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? colorScheme.surface
-                          : colorScheme.surfaceContainerLowest,
-                      border: Border(
-                        left: BorderSide(
-                          color: isSelected
-                              ? colorScheme.primary
-                              : Colors.transparent,
-                          width: 3,
-                        ),
-                      ),
-                    ),
-                    child: Text(
-                      section.label,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: isSelected
-                            ? colorScheme.primary
-                            : colorScheme.onSurfaceVariant,
-                        fontWeight: isSelected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
+          _buildLeftNav(colorScheme),
           Expanded(
             // `Expanded` 占满 `Row` 剩余空间，让右侧内容区铺满。
             child: Container(
               color: colorScheme.surface,
-              child: CustomScrollView(
-                slivers: [
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
-                    sliver: SliverToBoxAdapter(
-                      child: _CategorySectionHeader(section: activeSection),
-                    ),
-                  ),
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-                    sliver: SliverToBoxAdapter(
-                      child: _CategoryWaterfallSection(
-                        section: activeSection,
-                        onProductTap: (product) => _openProductDetail(
-                          section: activeSection,
-                          product: product,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              child: _buildRightPanel(context),
             ),
           ),
         ],
       ),
     );
   }
-}
 
-class _CategorySectionHeader extends StatelessWidget {
-  final _CategorySection section;
+  /// 左侧一级分类导航，含加载与错误态。
+  Widget _buildLeftNav(ColorScheme colorScheme) {
+    if (_isCategoriesLoading) {
+      return SizedBox(
+        width: 96,
+        child: const Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2.5),
+          ),
+        ),
+      );
+    }
 
-  const _CategorySectionHeader({required this.section});
+    if (_categoryErrorMessage != null) {
+      return SizedBox(
+        width: 96,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.wifi_off_outlined, size: 32),
+            const SizedBox(height: 8),
+            Text(
+              _categoryErrorMessage!,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: _loadCategories,
+              child: const Text('重试'),
+            ),
+          ],
+        ),
+      );
+    }
 
-  @override
-  Widget build(BuildContext context) {
-    final TextTheme textTheme = Theme.of(context).textTheme;
+    return Container(
+      width: 96,
+      color: colorScheme.surfaceContainerLowest,
+      child: ListView.builder(
+        itemCount: _categories.length,
+        itemBuilder: (context, index) {
+          final CategoryNode category = _categories[index];
+          final bool isSelected = index == _selectedCategoryIndex;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+          return InkWell(
+            onTap: () => _selectCategory(index),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 18,
+              ),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? colorScheme.surface
+                    : colorScheme.surfaceContainerLowest,
+                border: Border(
+                  left: BorderSide(
+                    color: isSelected
+                        ? colorScheme.primary
+                        : Colors.transparent,
+                    width: 3,
+                  ),
+                ),
+              ),
+              child: Text(
+                category.name,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: isSelected
+                      ? colorScheme.primary
+                      : colorScheme.onSurfaceVariant,
+                  fontWeight: isSelected
+                      ? FontWeight.w700
+                      : FontWeight.w500,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// 右侧面板：二级分类 chips + 商品分页列表。
+  Widget _buildRightPanel(BuildContext context) {
+    if (_categoryErrorMessage != null) {
+      return _CategoryErrorPlaceholder(
+        message: _categoryErrorMessage!,
+        onRetry: _loadCategories,
+      );
+    }
+
+    if (_isCategoriesLoading) {
+      return const Center(
+        child: SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(strokeWidth: 2.5),
+        ),
+      );
+    }
+
+    if (_activeCategory == null) {
+      return const Center(child: Text('暂无分类'));
+    }
+
+    return CustomScrollView(
+      controller: _scrollController,
+      slivers: [
+        SliverToBoxAdapter(
+          child: _CategorySectionHeader(label: _activeCategoryLabel),
+        ),
+        if (_activeCategory!.hasChildren)
+          SliverToBoxAdapter(
+            child: _SubCategoryChips(
+              children: _activeCategory!.children,
+              selectedIndex: _selectedSubIndex,
+              onTap: _selectSubCategory,
+            ),
+          ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+          sliver: _buildProductContentSliver(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProductContentSliver() {
+    if (_isProductsLoading && _products.isEmpty) {
+      return const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 24),
+          child: Center(
+            child: SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2.5),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_productErrorMessage != null && _products.isEmpty) {
+      return SliverToBoxAdapter(
+        child: _CategoryErrorPlaceholder(
+          message: _productErrorMessage!,
+          onRetry: _reloadProducts,
+        ),
+      );
+    }
+
+    if (_products.isEmpty) {
+      return const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 24),
+          child: Center(child: Text('该分类下暂时没有商品')),
+        ),
+      );
+    }
+
+    return SliverList.list(
       children: [
-        Text(
-          section.label,
-          style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+        ..._products.map(
+          (product) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: ProductCard(
+              product: product,
+              onTap: () => _openProductDetail(product),
+            ),
+          ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          section.description,
-          style: textTheme.bodyMedium?.copyWith(height: 1.5),
-        ),
+        if (_isLoadingMore)
+          const Padding(
+            padding: EdgeInsets.only(top: 4, bottom: 12),
+            child: Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2.5),
+              ),
+            ),
+          ),
+        if (!_hasMore)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, bottom: 8),
+            child: Center(
+              child: Text(
+                '已经到底啦',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ),
+          ),
       ],
     );
   }
 }
 
-class _CategoryProductCard extends StatelessWidget {
-  final _CategoryProduct product;
-  final VoidCallback onTap;
+/// 右侧顶部标题：展示当前选中的分类名。
+class _CategorySectionHeader extends StatelessWidget {
+  final String label;
 
-  const _CategoryProductCard({required this.product, required this.onTap});
+  const _CategorySectionHeader({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Text(
+        label,
+        style: Theme.of(context)
+            .textTheme
+            .headlineSmall
+            ?.copyWith(fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+}
+
+/// 二级分类横滑 chips。
+class _SubCategoryChips extends StatelessWidget {
+  final List<CategoryNode> children;
+  final int selectedIndex;
+  final ValueChanged<int> onTap;
+
+  const _SubCategoryChips({
+    required this.children,
+    required this.selectedIndex,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final ColorScheme colorScheme = Theme.of(context).colorScheme;
 
-    return InkWell(
-      key: ValueKey<String>('category-product-${product.name}'),
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              height: product.artworkHeight,
+    return SizedBox(
+      height: 56,
+      // `SingleChildScrollView` + `Row` 实现横向滑动的一排 chips。
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        itemCount: children.length,
+        separatorBuilder: (_, int index) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final CategoryNode child = children[index];
+          final bool isSelected = index == selectedIndex;
+
+          return InkWell(
+            borderRadius: BorderRadius.circular(999),
+            onTap: () => onTap(index),
+            child: Ink(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
-                color: colorScheme.secondaryContainer,
-                borderRadius: BorderRadius.circular(16),
+                color: isSelected
+                    ? colorScheme.primaryContainer
+                    : colorScheme.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(999),
               ),
-              alignment: Alignment.center,
-              child: Icon(product.icon, color: colorScheme.primary),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              product.name,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              product.subtitle,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
+              child: Center(
+                child: Text(
+                  child.name,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: isSelected
+                        ? colorScheme.primary
+                        : colorScheme.onSurface,
+                    fontWeight:
+                        isSelected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'EUR ${product.priceLabel}',
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: colorScheme.primary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 }
 
-class _CategoryWaterfallSection extends StatelessWidget {
-  final _CategorySection section;
-  final ValueChanged<_CategoryProduct> onProductTap;
+/// 分类页错误占位：错误文案 + 重试按钮。
+class _CategoryErrorPlaceholder extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
 
-  const _CategoryWaterfallSection({
-    required this.section,
-    required this.onProductTap,
+  const _CategoryErrorPlaceholder({
+    required this.message,
+    required this.onRetry,
   });
 
   @override
   Widget build(BuildContext context) {
-    final List<_CategoryProduct> leftColumnProducts = <_CategoryProduct>[];
-    final List<_CategoryProduct> rightColumnProducts = <_CategoryProduct>[];
-
-    for (int index = 0; index < section.products.length; index += 1) {
-      final _CategoryProduct product = section.products[index];
-
-      if (index.isEven) {
-        leftColumnProducts.add(product);
-      } else {
-        rightColumnProducts.add(product);
-      }
-    }
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(child: _CategoryWaterfallColumn(products: leftColumnProducts, onProductTap: onProductTap)),
-        const SizedBox(width: 12),
-        Expanded(child: _CategoryWaterfallColumn(products: rightColumnProducts, onProductTap: onProductTap)),
-      ],
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.wifi_off_outlined, size: 48),
+          const SizedBox(height: 12),
+          Text(message, style: Theme.of(context).textTheme.bodyLarge),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh),
+            label: const Text('重试'),
+          ),
+        ],
+      ),
     );
   }
 }
-
-class _CategoryWaterfallColumn extends StatelessWidget {
-  final List<_CategoryProduct> products;
-  final ValueChanged<_CategoryProduct> onProductTap;
-
-  const _CategoryWaterfallColumn({
-    required this.products,
-    required this.onProductTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: products
-          .map(
-            (product) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _CategoryProductCard(
-                product: product,
-                onTap: () => onProductTap(product),
-              ),
-            ),
-          )
-          .toList(growable: false),
-    );
-  }
-}
-
-class _CategorySection {
-  final String label;
-  final String description;
-  final List<_CategoryProduct> products;
-
-  const _CategorySection({
-    required this.label,
-    required this.description,
-    required this.products,
-  });
-}
-
-class _CategoryProduct {
-  final String name;
-  final String subtitle;
-  final String priceLabel;
-  final IconData icon;
-  final double artworkHeight;
-
-  const _CategoryProduct({
-    required this.name,
-    required this.subtitle,
-    required this.priceLabel,
-    required this.icon,
-    required this.artworkHeight,
-  });
-}
-
-const List<_CategorySection> _categorySections = [
-  _CategorySection(
-    label: '服饰',
-    description: '精选上装、下装与基础单品，覆盖日常通勤与运动穿搭。',
-    products: [
-      _CategoryProduct(
-        name: '运动速干T恤',
-        subtitle: '透气面料，适合日常训练',
-        priceLabel: '129',
-        icon: Icons.checkroom_outlined,
-        artworkHeight: 156,
-      ),
-      _CategoryProduct(
-        name: '轻量防晒衬衫',
-        subtitle: '轻薄外搭，适合通勤与出游',
-        priceLabel: '169',
-        icon: Icons.sunny_snowing,
-        artworkHeight: 124,
-      ),
-      _CategoryProduct(
-        name: '高腰运动短裤',
-        subtitle: '高腰包裹版型，活动更自在',
-        priceLabel: '149',
-        icon: Icons.directions_run_outlined,
-        artworkHeight: 144,
-      ),
-      _CategoryProduct(
-        name: '针织背心',
-        subtitle: '适合做夏季叠穿的基础单品',
-        priceLabel: '99',
-        icon: Icons.style_outlined,
-        artworkHeight: 178,
-      ),
-      _CategoryProduct(
-        name: '基础款牛仔裤',
-        subtitle: '直筒版型，容易搭配通勤造型',
-        priceLabel: '199',
-        icon: Icons.shopping_bag_outlined,
-        artworkHeight: 138,
-      ),
-      _CategoryProduct(
-        name: '夏日牛仔外套',
-        subtitle: '轻丹宁面料，适合空调房外搭',
-        priceLabel: '239',
-        icon: Icons.iron_outlined,
-        artworkHeight: 168,
-      ),
-      _CategoryProduct(
-        name: '棉质半身裙',
-        subtitle: '柔软棉质，日常穿着更舒适',
-        priceLabel: '159',
-        icon: Icons.terrain_outlined,
-        artworkHeight: 132,
-      ),
-      _CategoryProduct(
-        name: '连帽卫衣',
-        subtitle: '适合春秋通勤的百搭层次单品',
-        priceLabel: '219',
-        icon: Icons.dry_cleaning_outlined,
-        artworkHeight: 182,
-      ),
-    ],
-  ),
-  _CategorySection(
-    label: '鞋靴',
-    description: '精选跑鞋、板鞋与户外鞋款，满足通勤与户外场景。',
-    products: [
-      _CategoryProduct(
-        name: '轻弹跑鞋',
-        subtitle: '轻盈缓震，适合通勤和慢跑',
-        priceLabel: '299',
-        icon: Icons.hiking_outlined,
-        artworkHeight: 156,
-      ),
-      _CategoryProduct(
-        name: '城市通勤板鞋',
-        subtitle: '简洁鞋型，适合日常搭配',
-        priceLabel: '269',
-        icon: Icons.directions_walk_outlined,
-        artworkHeight: 128,
-      ),
-      _CategoryProduct(
-        name: '户外登山靴',
-        subtitle: '加固鞋帮，适合周末徒步',
-        priceLabel: '459',
-        icon: Icons.landscape_outlined,
-        artworkHeight: 176,
-      ),
-      _CategoryProduct(
-        name: '凉感拖鞋',
-        subtitle: '柔软脚感，适合居家与短途外出',
-        priceLabel: '89',
-        icon: Icons.beach_access_outlined,
-        artworkHeight: 138,
-      ),
-    ],
-  ),
-  _CategorySection(
-    label: '箱包',
-    description: '精选双肩包、托特包与收纳包，覆盖通勤、商务与旅行场景。',
-    products: [
-      _CategoryProduct(
-        name: '极简双肩包',
-        subtitle: '多层收纳，兼顾日常与短途',
-        priceLabel: '239',
-        icon: Icons.work_outline,
-        artworkHeight: 164,
-      ),
-      _CategoryProduct(
-        name: '轻商务托特包',
-        subtitle: '适合办公室与轻商务场景',
-        priceLabel: '199',
-        icon: Icons.shopping_bag_outlined,
-        artworkHeight: 140,
-      ),
-      _CategoryProduct(
-        name: '旅行收纳包',
-        subtitle: '分类收纳更清晰',
-        priceLabel: '129',
-        icon: Icons.luggage_outlined,
-        artworkHeight: 126,
-      ),
-      _CategoryProduct(
-        name: '斜挎马鞍包',
-        subtitle: '小巧包型，适合日常轻出行',
-        priceLabel: '269',
-        icon: Icons.shopping_bag,
-        artworkHeight: 174,
-      ),
-    ],
-  ),
-  _CategorySection(
-    label: '数码',
-    description: '精选耳机、音箱与桌面数码配件，提升影音与办公体验。',
-    products: [
-      _CategoryProduct(
-        name: '主动降噪耳机',
-        subtitle: '沉浸式降噪体验，适合通勤',
-        priceLabel: '699',
-        icon: Icons.headphones_outlined,
-        artworkHeight: 162,
-      ),
-      _CategoryProduct(
-        name: '便携蓝牙音箱',
-        subtitle: '小体积也能有不错外放表现',
-        priceLabel: '329',
-        icon: Icons.speaker_outlined,
-        artworkHeight: 132,
-      ),
-      _CategoryProduct(
-        name: '桌面补光灯',
-        subtitle: '提升桌面拍摄和视频会议亮度',
-        priceLabel: '159',
-        icon: Icons.light_mode_outlined,
-        artworkHeight: 148,
-      ),
-      _CategoryProduct(
-        name: '轻薄平板支架',
-        subtitle: '看剧和办公都更省力',
-        priceLabel: '79',
-        icon: Icons.tablet_mac_outlined,
-        artworkHeight: 120,
-      ),
-    ],
-  ),
-  _CategorySection(
-    label: '家居',
-    description: '精选香薰、抱枕与收纳好物，营造舒适居家氛围。',
-    products: [
-      _CategoryProduct(
-        name: '香薰氛围灯',
-        subtitle: '适合卧室和桌面营造氛围',
-        priceLabel: '139',
-        icon: Icons.nightlight_outlined,
-        artworkHeight: 168,
-      ),
-      _CategoryProduct(
-        name: '云感抱枕',
-        subtitle: '柔软支撑感，适合沙发与卧室',
-        priceLabel: '89',
-        icon: Icons.weekend_outlined,
-        artworkHeight: 132,
-      ),
-      _CategoryProduct(
-        name: '原木置物架',
-        subtitle: '轻松整理桌面与玄关小物',
-        priceLabel: '189',
-        icon: Icons.inventory_2_outlined,
-        artworkHeight: 154,
-      ),
-      _CategoryProduct(
-        name: '陶瓷马克杯',
-        subtitle: '日常咖啡和茶饮都适合',
-        priceLabel: '59',
-        icon: Icons.coffee_outlined,
-        artworkHeight: 122,
-      ),
-    ],
-  ),
-  _CategorySection(
-    label: '食品',
-    description: '精选坚果、麦片与代餐零食，适合通勤与日常补给。',
-    products: [
-      _CategoryProduct(
-        name: '坚果能量包',
-        subtitle: '适合通勤和加班时补充能量',
-        priceLabel: '49',
-        icon: Icons.local_grocery_store_outlined,
-        artworkHeight: 144,
-      ),
-      _CategoryProduct(
-        name: '黑巧麦片杯',
-        subtitle: '早餐或下午茶都方便',
-        priceLabel: '39',
-        icon: Icons.breakfast_dining_outlined,
-        artworkHeight: 130,
-      ),
-      _CategoryProduct(
-        name: '冻干水果盒',
-        subtitle: '口感轻脆，适合随手分享',
-        priceLabel: '59',
-        icon: Icons.apple_outlined,
-        artworkHeight: 160,
-      ),
-      _CategoryProduct(
-        name: '轻食代餐棒',
-        subtitle: '适合户外与忙碌通勤场景',
-        priceLabel: '29',
-        icon: Icons.cookie_outlined,
-        artworkHeight: 118,
-      ),
-    ],
-  ),
-];

@@ -3,10 +3,10 @@ import 'package:mockito/annotations.dart';
 
 import 'package:my_first_app/features/auth/data/auth_service.dart';
 import 'package:my_first_app/features/auth/data/token_store.dart';
-import 'package:my_first_app/features/home/data/home_recommend_service.dart';
 import 'package:my_first_app/features/payment/application/payment_gateway.dart';
 import 'package:my_first_app/features/payment/application/payment_order_provider.dart';
 import 'package:my_first_app/features/payment/application/payment_sdk_initializer.dart';
+import 'package:my_first_app/features/product/data/product_service.dart';
 
 /// 项目统一的 Mock 声明入口。
 ///
@@ -15,7 +15,7 @@ import 'package:my_first_app/features/payment/application/payment_sdk_initialize
 /// `mocks.mocks.dart`，测试文件只需要导入生成文件即可使用对应 Mock 类。
 ///
 /// 生成规则：接口类（如 [PaymentGateway]）直接实现接口；
-/// 具体类（如 [AuthService]、[HomeRecommendService]）mockito 会生成
+/// 具体类（如 [AuthService]、[ProductService]）mockito 会生成
 /// `implements` 式的 Mock，调用未打桩方法时 nice mock 返回 null/默认值
 /// 而不是抛错，所以测试里只应调用打桩过的方法。
 @GenerateNiceMocks([
@@ -25,8 +25,8 @@ import 'package:my_first_app/features/payment/application/payment_sdk_initialize
   MockSpec<TokenStore>(),
   // 认证服务：widget 测试与 AuthNotifier 单测的登录态替身。
   MockSpec<AuthService>(),
-  // 首页推荐服务：首页相关 widget 测试的数据源替身。
-  MockSpec<HomeRecommendService>(),
+  // 商品域服务：首页/分类/详情相关测试的数据源替身。
+  MockSpec<ProductService>(),
   // 支付网关接口：支付流程测试的替身。
   MockSpec<PaymentGateway>(),
   // 支付参数提供方接口：支付宝网关测试的替身。

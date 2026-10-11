@@ -5,7 +5,7 @@ import 'package:my_first_app/features/auth/data/token_store.dart';
 
 /// 认证数据服务，对接 spring-shop 的认证接口。
 ///
-/// 与 [HomeRecommendService] 的分层思路一致：
+/// 与商品模块 `ProductService` 的分层思路一致：
 /// - [ApiClient] 负责 baseUrl、请求头、token 注入和 HTTP 异常
 /// - 本服务负责 `Result<T>` 解包和 JSON 到模型的映射
 class AuthService {
