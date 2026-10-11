@@ -11,34 +11,38 @@ import 'package:dio/src/adapter.dart' as _i2;
 import 'package:dio/src/options.dart' as _i10;
 import 'package:mockito/mockito.dart' as _i1;
 import 'package:mockito/src/dummies.dart' as _i13;
-import 'package:my_first_app/app/config/app_config.dart' as _i23;
+import 'package:my_first_app/app/config/app_config.dart' as _i25;
 import 'package:my_first_app/features/auth/data/auth_service.dart' as _i14;
 import 'package:my_first_app/features/auth/data/models/user_info.dart' as _i3;
 import 'package:my_first_app/features/auth/data/token_store.dart' as _i12;
 import 'package:my_first_app/features/cart/data/cart_service.dart' as _i15;
 import 'package:my_first_app/features/cart/data/models/cart_vo.dart' as _i4;
 import 'package:my_first_app/features/payment/application/payment_gateway.dart'
-    as _i19;
-import 'package:my_first_app/features/payment/application/payment_order_provider.dart'
     as _i21;
+import 'package:my_first_app/features/payment/application/payment_order_provider.dart'
+    as _i23;
 import 'package:my_first_app/features/payment/application/payment_sdk_initializer.dart'
-    as _i22;
+    as _i24;
 import 'package:my_first_app/features/payment/data/models/alipay_payment_payload.dart'
     as _i8;
 import 'package:my_first_app/features/payment/data/models/payment_request.dart'
-    as _i20;
+    as _i22;
 import 'package:my_first_app/features/payment/presentation/models/payment_result.dart'
     as _i7;
 import 'package:my_first_app/features/product/data/models/category_node.dart'
-    as _i18;
+    as _i20;
 import 'package:my_first_app/features/product/data/models/page_result.dart'
     as _i5;
 import 'package:my_first_app/features/product/data/models/product_detail.dart'
     as _i6;
 import 'package:my_first_app/features/product/data/models/product_summary.dart'
-    as _i17;
+    as _i19;
 import 'package:my_first_app/features/product/data/product_service.dart'
+    as _i18;
+import 'package:my_first_app/features/profile/data/address_service.dart'
     as _i16;
+import 'package:my_first_app/features/profile/data/models/address_vo.dart'
+    as _i17;
 
 // ignore_for_file: type=lint
 // ignore_for_file: avoid_redundant_argument_values
@@ -362,12 +366,100 @@ class MockCartService extends _i1.Mock implements _i15.CartService {
           as _i9.Future<void>);
 }
 
+/// A class which mocks [AddressService].
+///
+/// See the documentation for Mockito's code generation for more information.
+class MockAddressService extends _i1.Mock implements _i16.AddressService {
+  @override
+  _i9.Future<List<_i17.AddressVO>> fetchAddresses() =>
+      (super.noSuchMethod(
+            Invocation.method(#fetchAddresses, []),
+            returnValue: _i9.Future<List<_i17.AddressVO>>.value(
+              <_i17.AddressVO>[],
+            ),
+            returnValueForMissingStub: _i9.Future<List<_i17.AddressVO>>.value(
+              <_i17.AddressVO>[],
+            ),
+          )
+          as _i9.Future<List<_i17.AddressVO>>);
+
+  @override
+  _i9.Future<int> addAddress({
+    required String? receiverName,
+    required String? receiverPhone,
+    required String? province,
+    required String? city,
+    required String? district,
+    required String? detailAddress,
+    bool? isDefault = false,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(#addAddress, [], {
+              #receiverName: receiverName,
+              #receiverPhone: receiverPhone,
+              #province: province,
+              #city: city,
+              #district: district,
+              #detailAddress: detailAddress,
+              #isDefault: isDefault,
+            }),
+            returnValue: _i9.Future<int>.value(0),
+            returnValueForMissingStub: _i9.Future<int>.value(0),
+          )
+          as _i9.Future<int>);
+
+  @override
+  _i9.Future<void> updateAddress({
+    required int? id,
+    required String? receiverName,
+    required String? receiverPhone,
+    required String? province,
+    required String? city,
+    required String? district,
+    required String? detailAddress,
+    bool? isDefault = false,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(#updateAddress, [], {
+              #id: id,
+              #receiverName: receiverName,
+              #receiverPhone: receiverPhone,
+              #province: province,
+              #city: city,
+              #district: district,
+              #detailAddress: detailAddress,
+              #isDefault: isDefault,
+            }),
+            returnValue: _i9.Future<void>.value(),
+            returnValueForMissingStub: _i9.Future<void>.value(),
+          )
+          as _i9.Future<void>);
+
+  @override
+  _i9.Future<void> deleteAddress(int? id) =>
+      (super.noSuchMethod(
+            Invocation.method(#deleteAddress, [id]),
+            returnValue: _i9.Future<void>.value(),
+            returnValueForMissingStub: _i9.Future<void>.value(),
+          )
+          as _i9.Future<void>);
+
+  @override
+  _i9.Future<void> setDefaultAddress(int? id) =>
+      (super.noSuchMethod(
+            Invocation.method(#setDefaultAddress, [id]),
+            returnValue: _i9.Future<void>.value(),
+            returnValueForMissingStub: _i9.Future<void>.value(),
+          )
+          as _i9.Future<void>);
+}
+
 /// A class which mocks [ProductService].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockProductService extends _i1.Mock implements _i16.ProductService {
+class MockProductService extends _i1.Mock implements _i18.ProductService {
   @override
-  _i9.Future<_i5.PageResult<_i17.ProductSummary>> fetchProducts({
+  _i9.Future<_i5.PageResult<_i19.ProductSummary>> fetchProducts({
     int? categoryId,
     String? keyword,
     int? current = 1,
@@ -380,8 +472,8 @@ class MockProductService extends _i1.Mock implements _i16.ProductService {
               #current: current,
               #size: size,
             }),
-            returnValue: _i9.Future<_i5.PageResult<_i17.ProductSummary>>.value(
-              _FakePageResult_4<_i17.ProductSummary>(
+            returnValue: _i9.Future<_i5.PageResult<_i19.ProductSummary>>.value(
+              _FakePageResult_4<_i19.ProductSummary>(
                 this,
                 Invocation.method(#fetchProducts, [], {
                   #categoryId: categoryId,
@@ -392,8 +484,8 @@ class MockProductService extends _i1.Mock implements _i16.ProductService {
               ),
             ),
             returnValueForMissingStub:
-                _i9.Future<_i5.PageResult<_i17.ProductSummary>>.value(
-                  _FakePageResult_4<_i17.ProductSummary>(
+                _i9.Future<_i5.PageResult<_i19.ProductSummary>>.value(
+                  _FakePageResult_4<_i19.ProductSummary>(
                     this,
                     Invocation.method(#fetchProducts, [], {
                       #categoryId: categoryId,
@@ -404,7 +496,7 @@ class MockProductService extends _i1.Mock implements _i16.ProductService {
                   ),
                 ),
           )
-          as _i9.Future<_i5.PageResult<_i17.ProductSummary>>);
+          as _i9.Future<_i5.PageResult<_i19.ProductSummary>>);
 
   @override
   _i9.Future<_i6.ProductDetail> fetchProductDetail(int? id) =>
@@ -426,26 +518,26 @@ class MockProductService extends _i1.Mock implements _i16.ProductService {
           as _i9.Future<_i6.ProductDetail>);
 
   @override
-  _i9.Future<List<_i18.CategoryNode>> fetchCategoryTree() =>
+  _i9.Future<List<_i20.CategoryNode>> fetchCategoryTree() =>
       (super.noSuchMethod(
             Invocation.method(#fetchCategoryTree, []),
-            returnValue: _i9.Future<List<_i18.CategoryNode>>.value(
-              <_i18.CategoryNode>[],
+            returnValue: _i9.Future<List<_i20.CategoryNode>>.value(
+              <_i20.CategoryNode>[],
             ),
             returnValueForMissingStub:
-                _i9.Future<List<_i18.CategoryNode>>.value(
-                  <_i18.CategoryNode>[],
+                _i9.Future<List<_i20.CategoryNode>>.value(
+                  <_i20.CategoryNode>[],
                 ),
           )
-          as _i9.Future<List<_i18.CategoryNode>>);
+          as _i9.Future<List<_i20.CategoryNode>>);
 }
 
 /// A class which mocks [PaymentGateway].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockPaymentGateway extends _i1.Mock implements _i19.PaymentGateway {
+class MockPaymentGateway extends _i1.Mock implements _i21.PaymentGateway {
   @override
-  _i9.Future<_i7.PaymentResult> pay(_i20.PaymentRequest? request) =>
+  _i9.Future<_i7.PaymentResult> pay(_i22.PaymentRequest? request) =>
       (super.noSuchMethod(
             Invocation.method(#pay, [request]),
             returnValue: _i9.Future<_i7.PaymentResult>.value(
@@ -462,10 +554,10 @@ class MockPaymentGateway extends _i1.Mock implements _i19.PaymentGateway {
 ///
 /// See the documentation for Mockito's code generation for more information.
 class MockPaymentOrderProvider extends _i1.Mock
-    implements _i21.PaymentOrderProvider {
+    implements _i23.PaymentOrderProvider {
   @override
   _i9.Future<_i8.AlipayPaymentPayload> fetchAlipayPayload(
-    _i20.PaymentRequest? request,
+    _i22.PaymentRequest? request,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#fetchAlipayPayload, [request]),
@@ -490,9 +582,9 @@ class MockPaymentOrderProvider extends _i1.Mock
 ///
 /// See the documentation for Mockito's code generation for more information.
 class MockPaymentSdkInitializer extends _i1.Mock
-    implements _i22.PaymentSdkInitializer {
+    implements _i24.PaymentSdkInitializer {
   @override
-  _i9.Future<void> initialize(_i23.AppConfig? config) =>
+  _i9.Future<void> initialize(_i25.AppConfig? config) =>
       (super.noSuchMethod(
             Invocation.method(#initialize, [config]),
             returnValue: _i9.Future<void>.value(),

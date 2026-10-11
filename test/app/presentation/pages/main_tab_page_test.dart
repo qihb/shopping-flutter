@@ -24,7 +24,7 @@ import 'package:my_first_app/features/product/data/models/product_sku.dart';
 import 'package:my_first_app/features/product/data/models/product_summary.dart';
 import 'package:my_first_app/features/profile/application/address_notifier.dart';
 import 'package:my_first_app/features/profile/application/settings_notifier.dart';
-import 'package:my_first_app/features/profile/presentation/models/user_address.dart';
+import 'package:my_first_app/features/profile/data/models/address_vo.dart';
 import '../../../helpers/mocks.mocks.dart';
 import '../../../helpers/stub_helpers.dart';
 
@@ -296,6 +296,121 @@ MockCartService _buildCartService() {
   return service;
 }
 
+/// 创建带本地可变快照的地址服务，模拟服务端地址行为。
+///
+/// 变更接口只改服务端数据不返回列表，
+/// `AddressNotifier` 每次变更后重新调用 [MockAddressService.fetchAddresses]
+/// 读回最新状态，与真实服务端的交互顺序一致。
+MockAddressService _buildAddressService() {
+  final MockAddressService service = MockAddressService();
+
+  // 服务端当前的地址快照：一条默认地址（浦东新区）+ 一条普通地址（徐汇区）。
+  List<AddressVO> addresses = <AddressVO>[
+    buildTestAddress(1, isDefault: true),
+    buildTestAddress(
+      2,
+      district: '徐汇区',
+      detailAddress: '漕河泾开发区',
+    ),
+  ];
+  int nextId = 3;
+
+  when(service.fetchAddresses()).thenAnswer((_) async {
+    // 与服务端排序口径一致：默认地址排在首位。
+    final List<AddressVO> defaults =
+        addresses.where((AddressVO a) => a.isDefault).toList();
+    final List<AddressVO> others =
+        addresses.where((AddressVO a) => !a.isDefault).toList();
+    return <AddressVO>[...defaults, ...others];
+  });
+
+  when(service.addAddress(
+    receiverName: anyNamed('receiverName'),
+    receiverPhone: anyNamed('receiverPhone'),
+    province: anyNamed('province'),
+    city: anyNamed('city'),
+    district: anyNamed('district'),
+    detailAddress: anyNamed('detailAddress'),
+    isDefault: anyNamed('isDefault'),
+  )).thenAnswer((Invocation invocation) async {
+    final Map<Symbol, Object?> args = invocation.namedArguments;
+    final bool isDefault = args[#isDefault] as bool? ?? false;
+
+    if (isDefault) {
+      // 新的默认地址会顶掉原有默认，与后端行为一致。
+      addresses = addresses
+          .map((AddressVO a) => a.copyWith(isDefault: false))
+          .toList();
+    }
+
+    addresses = <AddressVO>[
+      ...addresses,
+      AddressVO(
+        id: nextId,
+        receiverName: args[#receiverName] as String,
+        receiverPhone: args[#receiverPhone] as String,
+        province: args[#province] as String,
+        city: args[#city] as String,
+        district: args[#district] as String,
+        detailAddress: args[#detailAddress] as String,
+        isDefault: isDefault,
+      ),
+    ];
+    return nextId++;
+  });
+
+  when(service.updateAddress(
+    id: anyNamed('id'),
+    receiverName: anyNamed('receiverName'),
+    receiverPhone: anyNamed('receiverPhone'),
+    province: anyNamed('province'),
+    city: anyNamed('city'),
+    district: anyNamed('district'),
+    detailAddress: anyNamed('detailAddress'),
+    isDefault: anyNamed('isDefault'),
+  )).thenAnswer((Invocation invocation) async {
+    final Map<Symbol, Object?> args = invocation.namedArguments;
+    final int id = args[#id] as int;
+    final bool isDefault = args[#isDefault] as bool? ?? false;
+
+    if (isDefault) {
+      addresses = addresses
+          .map((AddressVO a) => a.copyWith(isDefault: false))
+          .toList();
+    }
+
+    addresses = addresses
+        .map((AddressVO a) => a.id == id
+            ? AddressVO(
+                id: id,
+                receiverName: args[#receiverName] as String,
+                receiverPhone: args[#receiverPhone] as String,
+                province: args[#province] as String,
+                city: args[#city] as String,
+                district: args[#district] as String,
+                detailAddress: args[#detailAddress] as String,
+                isDefault: isDefault,
+              )
+            : a)
+        .toList();
+  });
+
+  when(service.deleteAddress(any)).thenAnswer((Invocation invocation) async {
+    final int id = invocation.positionalArguments.first as int;
+    addresses = addresses.where((AddressVO a) => a.id != id).toList();
+  });
+
+  when(service.setDefaultAddress(any)).thenAnswer((Invocation invocation) async {
+    final int id = invocation.positionalArguments.first as int;
+    // 后端会把目标地址设为默认，同时取消其它地址的默认标记。
+    addresses = addresses
+        .map((AddressVO a) => a.copyWith(isDefault: a.id == id))
+        .toList();
+  });
+
+  return service;
+}
+
 /// 创建默认支付成功的网关（用于不需要自定义支付结果的测试）。
 MockPaymentGateway _buildSuccessGateway() {
   final MockPaymentGateway gateway = MockPaymentGateway();
@@ -365,23 +480,8 @@ Widget _buildTestApp({
         create: (_) => OrderNotifier(paymentService: service),
       ),
       ChangeNotifierProvider<AddressNotifier>(
-        create: (_) => AddressNotifier(
-          initialAddresses: const <UserAddress>[
-            UserAddress(
-              recipientName: 'Qi Hai Bing',
-              phone: '138 0000 1234',
-              cityLabel: '上海市',
-              detailAddress: '浦东新区张江高科',
-              isDefault: true,
-            ),
-            UserAddress(
-              recipientName: 'Qi Hai Bing',
-              phone: '138 0000 5678',
-              cityLabel: '上海市',
-              detailAddress: '徐汇区漕河泾开发区',
-            ),
-          ],
-        ),
+        create: (_) => AddressNotifier(addressService: _buildAddressService())
+          ..attachAuth(authNotifier),
       ),
       ChangeNotifierProvider<SettingsNotifier>(create: (_) => SettingsNotifier()),
     ],
@@ -724,7 +824,8 @@ void main() {
   });
 
   testWidgets('我的页面可以进入地址管理页并展示地址列表', (WidgetTester tester) async {
-    await tester.pumpWidget(_buildTestApp());
+    // 地址现在是服务端数据，需要登录态才能拉取。
+    await tester.pumpWidget(_buildTestApp(loggedIn: true));
 
     await tester.tap(find.text('我的'));
     await tester.pumpAndSettle();
@@ -745,6 +846,61 @@ void main() {
     expect(find.text('上海市徐汇区漕河泾开发区'), findsOneWidget);
   });
 
+  testWidgets('地址管理页可以新增地址并出现在列表中', (WidgetTester tester) async {
+    await tester.pumpWidget(_buildTestApp(loggedIn: true));
+
+    await tester.tap(find.text('我的'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey<String>('profile-address-manage-entry')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('profile-address-manage-entry')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey<String>('address-add-entry')));
+    await tester.pumpAndSettle();
+    expect(find.text('新增地址'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey<String>('address-edit-name')),
+      '测试收货人',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey<String>('address-edit-phone')),
+      '13900005678',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey<String>('address-edit-province')),
+      '江苏省',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey<String>('address-edit-city')),
+      '苏州市',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey<String>('address-edit-district')),
+      '工业园区',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey<String>('address-edit-detail')),
+      '金鸡湖大道 88 号',
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey<String>('address-edit-save')));
+    await tester.pumpAndSettle();
+
+    // 保存成功后退回地址管理页，静默刷新后新地址出现在列表中。
+    expect(find.text('测试收货人'), findsOneWidget);
+    expect(find.text('江苏省苏州市工业园区金鸡湖大道 88 号'), findsOneWidget);
+  });
+
   testWidgets('修改默认地址后订单确认页会展示新的收货地址', (WidgetTester tester) async {
     await tester.pumpWidget(_buildTestApp(loggedIn: true));
 
@@ -761,17 +917,17 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // 地址操作的 key 以服务端地址 id 命名。
     await tester.tap(
-      find.byKey(
-        const ValueKey<String>('address-set-default-上海市徐汇区漕河泾开发区'),
-      ),
+      find.byKey(const ValueKey<String>('address-set-default-2')),
     );
     await tester.pumpAndSettle();
 
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    expect(find.text('默认地址 上海市徐汇区漕河泾开发区'), findsOneWidget);
+    // 「我的」页的头卡与地址区各渲染一份相同的默认地址文案。
+    expect(find.text('默认地址 上海市徐汇区漕河泾开发区'), findsWidgets);
 
     await tester.tap(find.text('首页'));
     await tester.pumpAndSettle();

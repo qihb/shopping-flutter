@@ -8,6 +8,7 @@ import 'package:my_first_app/features/payment/application/payment_gateway.dart';
 import 'package:my_first_app/features/payment/application/payment_order_provider.dart';
 import 'package:my_first_app/features/payment/application/payment_sdk_initializer.dart';
 import 'package:my_first_app/features/product/data/product_service.dart';
+import 'package:my_first_app/features/profile/data/address_service.dart';
 
 /// 项目统一的 Mock 声明入口。
 ///
@@ -28,6 +29,8 @@ import 'package:my_first_app/features/product/data/product_service.dart';
   MockSpec<AuthService>(),
   // 购物车服务：购物车相关测试的数据源替身。
   MockSpec<CartService>(),
+  // 收货地址服务：地址相关测试的数据源替身。
+  MockSpec<AddressService>(),
   // 商品域服务：首页/分类/详情相关测试的数据源替身。
   MockSpec<ProductService>(),
   // 支付网关接口：支付流程测试的替身。

@@ -15,7 +15,7 @@ import 'package:my_first_app/features/payment/application/payment_service_factor
 import 'package:my_first_app/features/product/data/product_service.dart';
 import 'package:my_first_app/features/profile/application/address_notifier.dart';
 import 'package:my_first_app/features/profile/application/settings_notifier.dart';
-import 'package:my_first_app/features/profile/presentation/models/user_address.dart';
+import 'package:my_first_app/features/profile/data/address_service.dart';
 
 /// 整个应用的根组件。
 ///
@@ -35,11 +35,15 @@ class MyApp extends StatelessWidget {
   /// 可选注入的购物车 Notifier，主要用于测试时替换服务端购物车实现。
   final CartNotifier? cartNotifier;
 
+  /// 可选注入的收货地址 Notifier，主要用于测试时替换服务端地址实现。
+  final AddressNotifier? addressNotifier;
+
   const MyApp({
     super.key,
     this.productService,
     this.authNotifier,
     this.cartNotifier,
+    this.addressNotifier,
   });
 
   /// 创建真实环境的登录态管理。
@@ -91,6 +95,20 @@ class MyApp extends StatelessWidget {
     return CartNotifier(cartService: CartService(apiClient: apiClient));
   }
 
+  /// 创建真实环境的收货地址状态管理。
+  ///
+  /// 地址接口同样需要登录态，与购物车使用相同的 token 注入方式。
+  AddressNotifier _createAddressNotifier() {
+    final ApiClient apiClient = ApiClient(
+      baseUrl: AppConfigStore.instance.apiBaseUrl,
+      tokenProvider: SharedPrefsTokenStore().readToken,
+    );
+
+    return AddressNotifier(
+      addressService: AddressService(apiClient: apiClient),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final appConfig = AppConfigStore.instance;
@@ -114,23 +132,13 @@ class MyApp extends StatelessWidget {
           ),
         ),
         ChangeNotifierProvider<AddressNotifier>(
-          create: (_) => AddressNotifier(
-            initialAddresses: const <UserAddress>[
-              UserAddress(
-                recipientName: 'Qi Hai Bing',
-                phone: '138 0000 1234',
-                cityLabel: '上海市',
-                detailAddress: '浦东新区张江高科',
-                isDefault: true,
-              ),
-              UserAddress(
-                recipientName: 'Qi Hai Bing',
-                phone: '138 0000 5678',
-                cityLabel: '上海市',
-                detailAddress: '徐汇区漕河泾开发区',
-              ),
-            ],
-          ),
+          create: (context) {
+            final AddressNotifier notifier =
+                addressNotifier ?? _createAddressNotifier();
+            // 登录 / 退出时自动拉取或清空地址，无需页面手动编排。
+            notifier.attachAuth(context.read<AuthNotifier>());
+            return notifier;
+          },
         ),
         ChangeNotifierProvider<SettingsNotifier>(
           create: (_) => SettingsNotifier(),

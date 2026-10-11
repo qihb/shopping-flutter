@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'package:my_first_app/features/order/presentation/models/order_record.dart';
 import 'package:my_first_app/features/order/presentation/pages/order_record_page.dart';
+import 'package:my_first_app/features/profile/data/models/address_vo.dart';
 import 'package:my_first_app/features/profile/presentation/models/profile_settings.dart';
-import 'package:my_first_app/features/profile/presentation/models/user_address.dart';
 import 'package:my_first_app/features/profile/presentation/models/user_profile_summary.dart';
 import 'package:my_first_app/features/profile/presentation/pages/address_management_page.dart';
 
@@ -14,12 +14,11 @@ import 'package:my_first_app/features/profile/presentation/pages/address_managem
 class ProfilePage extends StatelessWidget {
   final UserProfileSummary profile;
   final bool isLoggedIn;
-  final List<UserAddress> addresses;
+  final List<AddressVO> addresses;
   final ProfileSettings settings;
   final List<OrderRecord> orders;
   final ValueChanged<OrderRecord>? onAdvanceOrderStatus;
   final Future<bool> Function(OrderRecord order)? onRepayOrder;
-  final ValueChanged<UserAddress>? onSetDefaultAddress;
   final ValueChanged<bool>? onNotificationChanged;
   final ValueChanged<bool>? onBiometricUnlockChanged;
   final ValueChanged<bool>? onPriceAlertChanged;
@@ -30,12 +29,11 @@ class ProfilePage extends StatelessWidget {
     super.key,
     required this.profile,
     this.isLoggedIn = true,
-    this.addresses = const <UserAddress>[],
+    this.addresses = const <AddressVO>[],
     required this.settings,
     this.orders = const <OrderRecord>[],
     this.onAdvanceOrderStatus,
     this.onRepayOrder,
-    this.onSetDefaultAddress,
     this.onNotificationChanged,
     this.onBiometricUnlockChanged,
     this.onPriceAlertChanged,
@@ -70,10 +68,7 @@ class ProfilePage extends StatelessWidget {
           else
             _ProfileLatestOrderCard(order: latestOrder),
           const SizedBox(height: 20),
-          _ProfileAddressSection(
-            addresses: addresses,
-            onSetDefaultAddress: onSetDefaultAddress,
-          ),
+          _ProfileAddressSection(addresses: addresses),
           const SizedBox(height: 20),
           _ProfileSettingsSection(
             settings: settings,
@@ -442,30 +437,28 @@ class _ProfileSettingsSection extends StatelessWidget {
 }
 
 class _ProfileAddressSection extends StatelessWidget {
-  final List<UserAddress> addresses;
-  final ValueChanged<UserAddress>? onSetDefaultAddress;
+  final List<AddressVO> addresses;
 
-  const _ProfileAddressSection({
-    required this.addresses,
-    this.onSetDefaultAddress,
-  });
+  const _ProfileAddressSection({required this.addresses});
 
   void _openAddressManagementPage(BuildContext context) {
+    // 地址管理页自己 watch AddressNotifier 并直接操作服务端接口，
+    // 这里只负责跳转，不再回传数据与回调。
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (context) => AddressManagementPage(
-          addresses: addresses,
-          onSetDefaultAddress: onSetDefaultAddress,
-        ),
+        builder: (_) => const AddressManagementPage(),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final UserAddress? defaultAddress = addresses.isEmpty
+    final AddressVO? defaultAddress = addresses.isEmpty
         ? null
-        : addresses.firstWhere((address) => address.isDefault);
+        : addresses.firstWhere(
+            (AddressVO address) => address.isDefault,
+            orElse: () => addresses.first,
+          );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -497,7 +490,7 @@ class _ProfileAddressSection extends StatelessWidget {
                         Text(
                           defaultAddress == null
                               ? '后续可以在这里维护多个收货地址'
-                              : '${defaultAddress.recipientName} ${defaultAddress.phone}',
+                              : '${defaultAddress.receiverName} ${defaultAddress.receiverPhone}',
                         ),
                       ],
                     ),

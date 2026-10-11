@@ -8,6 +8,7 @@ import 'package:my_first_app/features/product/data/models/product_detail.dart';
 import 'package:my_first_app/features/product/data/models/product_image.dart';
 import 'package:my_first_app/features/product/data/models/product_sku.dart';
 import 'package:my_first_app/features/product/data/models/product_summary.dart';
+import 'package:my_first_app/features/profile/data/models/address_vo.dart';
 import 'mocks.mocks.dart';
 
 /// 构造一条测试用的商品摘要数据。
@@ -202,4 +203,63 @@ void stubCartMutationsSuccess(MockCartService service) {
       .thenAnswer((_) async {});
   when(service.removeCheckedItems()).thenAnswer((_) async {});
   when(service.clearCart()).thenAnswer((_) async {});
+}
+
+/// 构造一条测试用的收货地址。
+///
+/// 默认为上海市的直辖市地址（省和市取值相同），
+/// 用于覆盖 [AddressVO.regionLabel] 的去重展示逻辑。
+AddressVO buildTestAddress(
+  int id, {
+  String receiverName = 'Qi Hai Bing',
+  String receiverPhone = '13800001234',
+  String province = '上海市',
+  String city = '上海市',
+  String district = '浦东新区',
+  String detailAddress = '张江高科',
+  bool isDefault = false,
+}) {
+  return AddressVO(
+    id: id,
+    receiverName: receiverName,
+    receiverPhone: receiverPhone,
+    province: province,
+    city: city,
+    district: district,
+    detailAddress: detailAddress,
+    isDefault: isDefault,
+  );
+}
+
+/// 给 [MockAddressService] 打桩：fetchAddresses 固定返回给定地址列表。
+void stubAddressFetch(MockAddressService service, List<AddressVO> addresses) {
+  when(service.fetchAddresses()).thenAnswer(
+    (_) async => List<AddressVO>.of(addresses),
+  );
+}
+
+/// 给 [MockAddressService] 打桩：所有变更操作默认成功。
+/// 新增地址固定返回新地址 id 100。
+void stubAddressMutationsSuccess(MockAddressService service) {
+  when(service.addAddress(
+    receiverName: anyNamed('receiverName'),
+    receiverPhone: anyNamed('receiverPhone'),
+    province: anyNamed('province'),
+    city: anyNamed('city'),
+    district: anyNamed('district'),
+    detailAddress: anyNamed('detailAddress'),
+    isDefault: anyNamed('isDefault'),
+  )).thenAnswer((_) async => 100);
+  when(service.updateAddress(
+    id: anyNamed('id'),
+    receiverName: anyNamed('receiverName'),
+    receiverPhone: anyNamed('receiverPhone'),
+    province: anyNamed('province'),
+    city: anyNamed('city'),
+    district: anyNamed('district'),
+    detailAddress: anyNamed('detailAddress'),
+    isDefault: anyNamed('isDefault'),
+  )).thenAnswer((_) async {});
+  when(service.deleteAddress(any)).thenAnswer((_) async {});
+  when(service.setDefaultAddress(any)).thenAnswer((_) async {});
 }

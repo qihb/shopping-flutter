@@ -16,6 +16,7 @@ import 'package:my_first_app/features/product/data/models/product_summary.dart';
 import 'package:my_first_app/features/product/data/product_service.dart';
 import 'package:my_first_app/features/profile/application/address_notifier.dart';
 import 'package:my_first_app/features/profile/application/settings_notifier.dart';
+import 'package:my_first_app/features/profile/data/models/address_vo.dart';
 import 'package:my_first_app/features/profile/presentation/models/user_address.dart';
 import 'package:my_first_app/features/profile/presentation/models/user_profile_summary.dart';
 import 'package:my_first_app/features/profile/presentation/pages/profile_page.dart';
@@ -58,15 +59,25 @@ class _MainTabPageState extends State<MainTabPage> {
   }) {
     final UserInfo? user = authNotifier.user;
 
-    final UserProfileSummary baseProfile = UserProfileSummary(
+    return UserProfileSummary(
       displayName: user?.displayName ?? '访客',
       phone: user?.phone ?? '',
       memberLabel: user != null ? '成长会员' : '',
-      defaultAddress: '上海市浦东新区张江高科',
+      defaultAddress: addressNotifier.defaultAddress?.fullAddress ?? '暂未设置',
     );
+  }
 
-    return baseProfile.copyWith(
-      defaultAddress: addressNotifier.defaultAddress.fullAddress,
+  /// 服务端地址 → 订单域收货快照模型。
+  ///
+  /// 订单确认页与订单记录目前仍以旧 [UserAddress] 为入参，
+  /// 这里做一层映射完成过渡；订单域服务端化之后会整体替换。
+  UserAddress _toOrderAddress(AddressVO address) {
+    return UserAddress(
+      recipientName: address.receiverName,
+      phone: address.receiverPhone,
+      cityLabel: address.regionLabel,
+      detailAddress: address.detailAddress,
+      isDefault: address.isDefault,
     );
   }
 
@@ -166,11 +177,19 @@ class _MainTabPageState extends State<MainTabPage> {
       return;
     }
 
+    // 收货地址是服务端数据，账号还没维护地址时先引导，不让流程带着空地址往下走。
+    final AddressVO? address = context.read<AddressNotifier>().defaultAddress;
+
+    if (address == null) {
+      _showMessage(context, '请先在「我的-地址管理」中添加收货地址');
+      return;
+    }
+
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (context) => OrderConfirmPage(
           items: selectedItems,
-          address: context.read<AddressNotifier>().defaultAddress,
+          address: _toOrderAddress(address),
           onConfirmPayment: (method) async {
             final bool didSucceed = await _submitOrder(context, method);
             if (!context.mounted) {
@@ -198,9 +217,16 @@ class _MainTabPageState extends State<MainTabPage> {
       return false;
     }
 
+    // 下单入口已做过无地址守卫，这里再兜底一次，避免空地址快照写入订单。
+    final AddressVO? address = addressNotifier.defaultAddress;
+
+    if (address == null) {
+      return false;
+    }
+
     final PaymentResult result = await orderNotifier.submitOrder(
       cartItems: cartNotifier.selectedItems,
-      shippingAddress: addressNotifier.defaultAddress,
+      shippingAddress: _toOrderAddress(address),
       method: method,
     );
 
@@ -294,13 +320,6 @@ class _MainTabPageState extends State<MainTabPage> {
     }
   }
 
-  // ---------- 默认地址 ----------
-
-  void _setDefaultAddress(BuildContext context, UserAddress address) {
-    context.read<AddressNotifier>().setDefault(address);
-    _showMessage(context, '默认地址已更新');
-  }
-
   // ---------- build ----------
 
   @override
@@ -346,8 +365,6 @@ class _MainTabPageState extends State<MainTabPage> {
             onRepayOrder: orderNotifier.orders.isEmpty
                 ? null
                 : (order) => _openRepayOrderConfirmPage(context, order: order),
-            onSetDefaultAddress: (address) =>
-                _setDefaultAddress(context, address),
             onNotificationChanged: (value) =>
                 _updateNotificationSetting(context, value),
             onBiometricUnlockChanged: (value) =>
